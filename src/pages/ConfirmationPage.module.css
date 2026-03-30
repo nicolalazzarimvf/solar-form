@@ -1,6 +1,10 @@
 .container {
   text-align: center;
   font-family: 'Be Vietnam Pro', sans-serif;
+  /* Avoid I-beam caret on headings/body when clicking static text */
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
 }
 
 .uatBanner {
@@ -78,6 +82,9 @@
   padding: 1.25rem;
   margin-bottom: 1.5rem;
   text-align: left;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: auto;
 }
 
 .detailRow {
@@ -257,6 +264,9 @@
 
 .emailNote {
   text-align: center;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: auto;
 }
 
 .openEmailWrapper {
