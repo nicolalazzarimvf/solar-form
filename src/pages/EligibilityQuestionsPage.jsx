@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useBooking } from '../contexts';
+import { useBooking, useInactivity } from '../contexts';
 import styles from './EligibilityQuestionsPage.module.css';
 
 const QUESTIONS = [
@@ -31,6 +31,7 @@ export default function EligibilityQuestionsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { setEligibilityData, updateBookingData, setJourneyStatus } = useBooking();
+  const { resetInactivityTimer } = useInactivity();
 
   const [answers, setAnswers] = useState({
     isOver75: null,
@@ -45,6 +46,11 @@ export default function EligibilityQuestionsPage() {
   useEffect(() => {
     setShowQuestionTooltip(false);
   }, [currentQuestionIndex]);
+
+  // Start a fresh inactivity window each time a new question is shown (Feras alignment)
+  useEffect(() => {
+    resetInactivityTimer();
+  }, [currentQuestionIndex, resetInactivityTimer]);
 
   const handleAnswer = (questionId, answer) => {
     const updated = { ...answers, [questionId]: answer };
