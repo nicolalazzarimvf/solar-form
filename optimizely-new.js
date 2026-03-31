@@ -6,6 +6,22 @@
     (window.__solarOptlyChangesAppliedCount || 0) + 1;
 
   if (window.__solarOptlyThankYouScriptLoaded) return;
+
+  (function redirectOrgSolarToAppointmentBooking() {
+    var loc = window.location || {};
+    var path = String(loc.pathname || '');
+    var appointmentSeg = '/appointment-booking-form/sp-uk';
+    if (
+      path.indexOf('/org-solar') !== -1 &&
+      path.indexOf(appointmentSeg) === -1
+    ) {
+      window.location.replace(
+        loc.origin + appointmentSeg + (loc.search || '') + (loc.hash || '')
+      );
+      return;
+    }
+  })();
+
   window.__solarOptlyThankYouScriptLoaded = true;
 
   (function () {
@@ -23,6 +39,7 @@
     appUrl:
       'https://solar-form-eight.vercel.app/loader',
     typPathContains: '/typ/project-solar/appointment/sp-uk/',
+    typPathContainsAppointmentBooking: '/appointment-booking-form/sp-uk',
     debug: false,
     maxWaitMs: 30000,
     pollMs: 250,
@@ -267,7 +284,10 @@
     var href = String(
       window.location && window.location.href ? window.location.href : ''
     );
-    return href.indexOf(CONFIG.typPathContains) !== -1;
+    return (
+      href.indexOf(CONFIG.typPathContains) !== -1 ||
+      href.indexOf(CONFIG.typPathContainsAppointmentBooking) !== -1
+    );
   }
 
   function persistEligibilityMarker() {
