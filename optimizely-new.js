@@ -7,6 +7,17 @@
 
   if (window.__solarOptlyThankYouScriptLoaded) return;
 
+  (function injectEarlyHideMainPageRows() {
+    if (document.getElementById('solar-optly-early-hide')) return;
+    var s = document.createElement('style');
+    s.id = 'solar-optly-early-hide';
+    s.textContent =
+      'div.vc_row.wpb_row.vc_row-fluid.background-position-center-center:nth-of-type(1),' +
+      'div.vc_row.wpb_row.vc_row-fluid.background-position-center-center:nth-of-type(3)' +
+      '{display:none!important}';
+    (document.head || document.documentElement).appendChild(s);
+  })();
+
   (function redirectOrgSolarToAppointmentBooking() {
     var loc = window.location || {};
     var path = String(loc.pathname || '');
@@ -23,17 +34,6 @@
   })();
 
   window.__solarOptlyThankYouScriptLoaded = true;
-
-  (function () {
-    if (document.getElementById('solar-optly-early-hide')) return;
-    var s = document.createElement('style');
-    s.id = 'solar-optly-early-hide';
-    s.textContent =
-      'div.vc_row.wpb_row.vc_row-fluid.background-position-center-center:nth-of-type(1),' +
-      'div.vc_row.wpb_row.vc_row-fluid.background-position-center-center:nth-of-type(3)' +
-      '{display:none!important}';
-    (document.head || document.documentElement).appendChild(s);
-  })();
 
   var CONFIG = {
     appUrl:
@@ -1265,6 +1265,11 @@
     setMainPageRowVisibility(!!window.__solarOptlyIframeReadyForReveal);
   }
 
+  function revealTypMarketingRows() {
+    window.__solarOptlyIframeReadyForReveal = true;
+    syncMainPageRowVisibility();
+  }
+
   function watchMainPageRowVisibility() {
     if (window.__solarOptlyMainPageRowObserver) return;
 
@@ -1464,7 +1469,7 @@
       log('Captured first_name prefill from answers', splitFirstName);
     }
     window.__solarOptlyQualified = true;
-    window.__solarOptlyIframeReadyForReveal = true;
+    window.__solarOptlyIframeReadyForReveal = false;
     persistEligibilityMarker();
     swapHeaderLogoToProjectSolar();
     log('Eligibility matched via', context);
@@ -1549,6 +1554,9 @@
         var postcode = extractPostcodeFromAnswers(eventObj.answers || {});
         if (!postcode) {
           log('Eligible but no postcode; cannot check slots; staying on TYP');
+          hideFullPageSubmitOverlay();
+          revealIframeAfterSwap(eventObj.iFrameId);
+          revealTypMarketingRows();
           return;
         }
         if (window.__solarOptlySlotCheckInFlight) {
@@ -1566,6 +1574,7 @@
             postAppointmentUpdate('failed', 'no_slots');
             hideFullPageSubmitOverlay();
             revealIframeAfterSwap(eventObj.iFrameId);
+            revealTypMarketingRows();
             log('Eligible but no slots available; staying on TYP');
           }
         }).catch(function (err) {
@@ -1573,12 +1582,14 @@
           postAppointmentUpdate('failed', 'slot_check_error');
           hideFullPageSubmitOverlay();
           revealIframeAfterSwap(eventObj.iFrameId);
+          revealTypMarketingRows();
           log('Slot check failed', err);
         });
       } else {
         postAppointmentUpdate('failed', 'not_eligible');
         hideFullPageSubmitOverlay();
         revealIframeAfterSwap(eventObj.iFrameId);
+        revealTypMarketingRows();
         log('Submission did not match eligibility');
       }
       return;
@@ -1605,6 +1616,9 @@
         var postcode = extractPostcodeFromAnswers(eventObj.answers || {});
         if (!postcode) {
           log('Eligible but no postcode; cannot check slots; staying on TYP');
+          hideFullPageSubmitOverlay();
+          revealIframeAfterSwap(eventObj.iFrameId);
+          revealTypMarketingRows();
           return;
         }
         if (window.__solarOptlySlotCheckInFlight) {
@@ -1622,6 +1636,7 @@
             postAppointmentUpdate('failed', 'no_slots');
             hideFullPageSubmitOverlay();
             revealIframeAfterSwap(eventObj.iFrameId);
+            revealTypMarketingRows();
             log('Eligible but no slots available; staying on TYP');
           }
         }).catch(function (err) {
@@ -1629,6 +1644,7 @@
           postAppointmentUpdate('failed', 'slot_check_error');
           hideFullPageSubmitOverlay();
           revealIframeAfterSwap(eventObj.iFrameId);
+          revealTypMarketingRows();
           log('Slot check failed', err);
         });
       } else if (window.__solarOptlyQualified || window.__solarOptlySlotCheckInFlight) {
@@ -1653,6 +1669,7 @@
       } else {
         hideFullPageSubmitOverlay();
         revealIframeAfterSwap(eventObj.iFrameId);
+        revealTypMarketingRows();
         log('thankYouPageReached had no eligible answers and no prior qualification');
       }
     }
@@ -1792,7 +1809,7 @@
       log('Loaded prefill answers from marker', freshMarker.prefillAnswers);
     }
     window.__solarOptlyQualified = true;
-    window.__solarOptlyIframeReadyForReveal = true;
+    window.__solarOptlyIframeReadyForReveal = false;
     hideIframeDuringSwap();
     syncMainPageRowVisibility();
     watchMainPageRowVisibility();
@@ -1800,10 +1817,10 @@
     swapIframeWhenReady();
     lockIframeToApp();
   } else if (isTypUrl()) {
-    window.__solarOptlyIframeReadyForReveal = true;
+    window.__solarOptlyIframeReadyForReveal = false;
     syncMainPageRowVisibility();
     watchMainPageRowVisibility();
-    log('On TYP but no fresh eligibility marker; keeping original TYP');
+    log('On TYP but no fresh eligibility marker; keeping marketing rows hidden until Chameleon completes');
   } else {
     watchMainPageRowVisibility();
   }
