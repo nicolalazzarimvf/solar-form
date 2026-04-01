@@ -562,11 +562,21 @@
     }
 
     var url = CONFIG.appointmentsApiUrl + '/' + encodeURIComponent(submissionId);
-    var body = {
-      status: status,
-      reason: step,
-      lead: buildLeadPayload(),
-    };
+    var body;
+
+    if (status === 'failed') {
+      url += '/failed';
+      body = {
+        reason: step,
+        lead: buildLeadPayload(),
+      };
+    } else {
+      body = {
+        status: status,
+        reason: step,
+        lead: buildLeadPayload(),
+      };
+    }
 
     if (errorDetail) {
       body.error_detail = errorDetail;
