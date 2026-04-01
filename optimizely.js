@@ -158,6 +158,26 @@
 
     var slotHtml = '';
     var slotResult = window.__solarOptlySlotCheckResult;
+    var slotPcForUi = '';
+    if (slotResult && slotResult.postcode) {
+      slotPcForUi = slotResult.postcode;
+    } else if (window.__solarOptlySlotCheckInFlight && window.__solarOptlySlotCheckPostcode) {
+      slotPcForUi = window.__solarOptlySlotCheckPostcode;
+    }
+    var slotAvailUrl = '';
+    if (slotPcForUi && CONFIG.getAvailabilityApiUrl) {
+      slotAvailUrl = CONFIG.getAvailabilityApiUrl + '/get-availability?postcode=' + encodeURIComponent(slotPcForUi);
+    }
+    var slotMetaHtml = '';
+    if (slotPcForUi) {
+      slotMetaHtml +=
+        '<div style="font-size:9px;color:#888;margin-top:6px;">postcode <span style="color:#ccc;">' + escapeHtml(slotPcForUi) + '</span></div>';
+    }
+    if (slotAvailUrl) {
+      slotMetaHtml +=
+        '<div style="font-size:9px;color:#9ecba7;margin-top:6px;">GET (availability)</div>' +
+        '<div style="font-size:9px;color:#ccc;word-break:break-all;line-height:1.35;">' + escapeHtml(slotAvailUrl) + '</div>';
+    }
     if (slotResult) {
       var slotColor = slotResult.hasSlots ? '#27ae60' : '#c0392b';
       var slotLabel = slotResult.hasSlots ? 'YES' : 'NO';
@@ -173,12 +193,13 @@
         '<div style="display:flex;align-items:center;gap:6px;">' +
         '<span style="background:' + slotColor + ';color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">' + slotLabel + '</span>' +
         '<span style="font-size:10px;color:#aaa;">' + escapeHtml(slotDetail) + '</span>' +
-        '</div></div>';
+        '</div>' + slotMetaHtml + '</div>';
     } else if (window.__solarOptlySlotCheckInFlight) {
       slotHtml =
         '<div style="margin:8px 0;padding:8px;background:#2d2d44;border-radius:6px;">' +
         '<div style="font-weight:600;font-size:11px;">Slot Check</div>' +
-        '<div style="font-size:10px;color:#f1c40f;margin-top:4px;">checking...</div></div>';
+        '<div style="font-size:10px;color:#f1c40f;margin-top:4px;">checking...</div>' +
+        slotMetaHtml + '</div>';
     }
 
     var endpointsHtml = '';
@@ -485,6 +506,7 @@
       return Promise.resolve(false);
     }
     var pc = postcode.trim().replace(/\s/g, '');
+    window.__solarOptlySlotCheckPostcode = pc;
     var url = CONFIG.getAvailabilityApiUrl + '/get-availability?postcode=' + encodeURIComponent(pc);
     var timeoutMs = CONFIG.slotCheckTimeoutMs || 5000;
     var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -494,7 +516,7 @@
       timeoutId = window.setTimeout(function () {
         if (controller) controller.abort();
         log('Slot check timeout');
-        window.__solarOptlySlotCheckResult = { hasSlots: false, error: 'Timeout (' + timeoutMs + 'ms)' };
+        window.__solarOptlySlotCheckResult = { hasSlots: false, error: 'Timeout (' + timeoutMs + 'ms)', postcode: pc };
         resolve(false);
       }, timeoutMs);
     });
@@ -510,7 +532,7 @@
     var fetchPromise = fetch(url, fetchOptions)
       .then(function (res) {
         if (!res.ok) {
-          window.__solarOptlySlotCheckResult = { status: res.status, hasSlots: false, error: 'HTTP ' + res.status };
+          window.__solarOptlySlotCheckResult = { status: res.status, hasSlots: false, error: 'HTTP ' + res.status, postcode: pc };
           return { slots: [] };
         }
         return res.json();
@@ -531,13 +553,14 @@
           hasSlots: hasSlots,
           days: availability.length,
           totalSlots: totalSlots,
+          postcode: pc,
           raw: data,
         };
         return hasSlots;
       })
       .catch(function (err) {
         log('Slot check failed', err);
-        window.__solarOptlySlotCheckResult = { hasSlots: false, error: String(err) };
+        window.__solarOptlySlotCheckResult = { hasSlots: false, error: String(err), postcode: pc };
         return false;
       })
       .finally(function () {
