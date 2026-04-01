@@ -1112,6 +1112,11 @@
             var stepMap = {
               'session_expired': 'session_expired',
               'disqualified': 'disqualified',
+              'roof_changed_since_imagery': 'roof_changed_since_imagery',
+              'solar_no_segments': 'solar_no_segments',
+              'solar_no_coverage': 'solar_no_coverage',
+              'solar_api_error': 'solar_api_error',
+              'solar_coordinates_unavailable': 'solar_coordinates_unavailable',
             };
             postAppointmentUpdate('failed', stepMap[reason] || 'booking_failed', reason);
           }

@@ -27,6 +27,15 @@ import styles from './SolarAssessmentPage.module.css';
 // Temporary flag to use mock data during UAT
 const USE_MOCK_DATA = false;
 
+/** Parent (Optimizely) maps this to POST …/appointments/{id} failed updates. */
+function notifyParentSolarJourneyFailed(error) {
+  if (typeof window === 'undefined' || window.parent === window) return;
+  window.parent.postMessage(
+    { type: 'solar-optly-booking-result', success: false, error },
+    '*'
+  );
+}
+
 // Mock solar assessment data for UAT with bounding boxes for map display
 const MOCK_SOLAR_DATA = {
   imageryDate: '2024-06-15',
@@ -180,6 +189,7 @@ export default function SolarAssessmentPage() {
     const timeout = setTimeout(() => {
       if (!hasFetched.current) {
         console.warn('[SolarAssessment] Timeout: coordinates never arrived');
+        notifyParentSolarJourneyFailed('solar_coordinates_unavailable');
         setLoading(false);
         setError('Location coordinates not available. Please go back and select your address.');
       }
@@ -300,8 +310,18 @@ export default function SolarAssessmentPage() {
       console.error('Solar assessment error:', err);
 
       if (err.message === 'NO_COVERAGE') {
+        notifyParentSolarJourneyFailed('solar_no_coverage');
         setError('Solar data is not available for this location. Google Solar API coverage is limited to certain areas. Please contact us for a manual assessment.');
+      } else if (
+        String(err.message || '').toLowerCase().indexOf('coordinate') !== -1
+      ) {
+        notifyParentSolarJourneyFailed('solar_coordinates_unavailable');
+        setError(
+          err.message ||
+            'Location coordinates not available. Please go back and select your address.'
+        );
       } else {
+        notifyParentSolarJourneyFailed('solar_api_error');
         setError('Unable to assess your roof. Please try again or contact support.');
       }
     } finally {
@@ -551,6 +571,7 @@ export default function SolarAssessmentPage() {
 
   const handleImageryWarningYes = () => {
     // User says roof has changed - end journey
+    notifyParentSolarJourneyFailed('roof_changed_since_imagery');
     setJourneyStatus('callback_required');
     updateBookingData({
       roofChangedSinceImagery: true,
@@ -629,6 +650,7 @@ export default function SolarAssessmentPage() {
             type="button"
             className={styles.continueButton}
             onClick={() => {
+              notifyParentSolarJourneyFailed('solar_no_segments');
               setJourneyStatus('callback_required');
               updateBookingData({
                 currentPage: '/confirmation',
