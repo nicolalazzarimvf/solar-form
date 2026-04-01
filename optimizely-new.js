@@ -1381,7 +1381,13 @@
       if (!window.__solarOptlyQualified) return;
       var current = targetIframe.getAttribute('src') || '';
       if (!isAppUrl(current)) {
-        var forced = buildAppUrl();
+        // Reuse first injected URL (stable query) so we do not bump &ts= on every
+        // enforce — a new src string forces a full iframe reload and splits analytics
+        // (e.g. Microsoft Clarity) into separate sessions per step.
+        var forced = window.__solarOptlyPinnedAppSrc || buildAppUrl();
+        if (!window.__solarOptlyPinnedAppSrc) {
+          window.__solarOptlyPinnedAppSrc = forced;
+        }
         targetIframe.src = forced;
         targetIframe.setAttribute('data-solar-optly', 'mounted');
         log('Iframe lock enforced app src', {
@@ -1439,6 +1445,7 @@
     }
 
     var nextSrc = buildAppUrl();
+    window.__solarOptlyPinnedAppSrc = nextSrc;
 
     hideIframeDuringSwap(preferredIFrameId || targetIframe.id);
     targetIframe.src = nextSrc;
