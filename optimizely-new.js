@@ -199,6 +199,36 @@
         '<div style="font-size:10px;color:#f1c40f;margin-top:4px;">checking...</div></div>';
     }
 
+    var endpointsHtml = '';
+    var apptSid = getSubmissionId();
+    var apptBase = CONFIG.appointmentsApiUrl;
+    if (apptSid) {
+      endpointsHtml =
+        '<div style="margin:8px 0;padding:8px;background:#2d2d44;border-radius:6px;">' +
+        '<div style="font-weight:600;font-size:11px;margin-bottom:6px;">Appointment endpoints</div>' +
+        '<div style="font-size:9px;color:#ccc;line-height:1.45;word-break:break-all;">' +
+        '<div style="color:#9ecba7;">POST (progress / success)</div>' +
+        '<div>' + escapeHtml(apptBase + '/' + encodeURIComponent(apptSid)) + '</div>' +
+        '<div style="color:#9ecba7;margin-top:6px;">POST (failed)</div>' +
+        '<div>' + escapeHtml(apptBase + '/' + encodeURIComponent(apptSid) + '/failed') + '</div>' +
+        '<div style="color:#9ecba7;margin-top:6px;">GET (status)</div>' +
+        '<div>' + escapeHtml(apptBase + '/' + encodeURIComponent(apptSid)) + '</div>' +
+        '</div></div>';
+    } else {
+      endpointsHtml =
+        '<div style="margin:8px 0;padding:8px;background:#2d2d44;border-radius:6px;">' +
+        '<div style="font-weight:600;font-size:11px;margin-bottom:6px;">Appointment endpoints</div>' +
+        '<div style="font-size:9px;color:#888;">No submissionId yet (templates):</div>' +
+        '<div style="font-size:9px;color:#ccc;margin-top:4px;line-height:1.45;word-break:break-all;">' +
+        '<div style="color:#9ecba7;">POST</div>' +
+        '<div>' + escapeHtml(apptBase + '/{id}') + '</div>' +
+        '<div style="color:#9ecba7;margin-top:6px;">POST (failed)</div>' +
+        '<div>' + escapeHtml(apptBase + '/{id}/failed') + '</div>' +
+        '<div style="color:#9ecba7;margin-top:6px;">GET</div>' +
+        '<div>' + escapeHtml(apptBase + '/{id}') + '</div>' +
+        '</div></div>';
+    }
+
     var appointmentHtml = '';
     var appointmentLog = window.__solarOptlyAppointmentLog || [];
     if (appointmentLog.length > 0) {
@@ -249,6 +279,7 @@
       '<div style="margin-bottom:8px;font-weight:700;color:#9ecba7;">Solar Debug</div>' +
       answersRow +
       slotHtml +
+      endpointsHtml +
       appointmentHtml +
       (answersHtml ? '<div style="margin-top:8px;max-height:200px;overflow:auto;">' + answersHtml + '</div>' : '');
 
