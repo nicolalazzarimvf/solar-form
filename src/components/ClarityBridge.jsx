@@ -12,10 +12,10 @@ export function ClarityBridge() {
   const { bookingData } = useBooking();
 
   useEffect(() => {
-    const sid = bookingData.sessionId;
+    const sid = bookingData.sessionId ? String(bookingData.sessionId) : '';
     if (!sid || typeof window.clarity !== 'function') return;
 
-    const sub = (bookingData.submissionId || '').trim();
+    const sub = String(bookingData.submissionId ?? '').trim();
     const customUser = sub || sid;
 
     try {
