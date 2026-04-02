@@ -5,6 +5,7 @@ import { BookingProvider, InactivityProvider } from './contexts';
 import { useBooking } from './contexts';
 import { BookingLayout, DemoPageLayout } from './components/layout';
 import { PrefillBridge } from './components/PrefillBridge';
+import { ClarityBridge } from './components/ClarityBridge';
 import {
   LoaderTransitionPage,
   IndexPage,
@@ -283,6 +284,7 @@ function App() {
     <BrowserRouter>
       <IframeAutoHeightBridge />
       <BookingProvider>
+        <ClarityBridge />
         <PrefillBridge />
         <InactivityProvider>
           <QueryPrefillBridge />

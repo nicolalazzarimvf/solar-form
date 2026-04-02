@@ -12,7 +12,7 @@ describe('BookingContext', () => {
 
     expect(result.current.bookingData).toBeDefined();
     expect(result.current.bookingData.firstName).toBe('');
-    expect(result.current.bookingData.sessionId).toBe('');
+    expect(result.current.bookingData.sessionId).toBeTruthy();
     expect(result.current.bookingData.journeyStatus).toBe('started');
   });
 

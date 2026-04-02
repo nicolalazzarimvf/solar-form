@@ -117,7 +117,16 @@ function persistState(data) {
 export function BookingProvider({ children }) {
   const [bookingData, setBookingData] = useState(() => {
     const persisted = loadPersistedState();
-    return persisted ? { ...DEFAULT_STATE, ...persisted } : { ...DEFAULT_STATE };
+    if (persisted) {
+      return { ...DEFAULT_STATE, ...persisted };
+    }
+    // One stable session id for the whole SPA (incl. /loader) so analytics tools
+    // (e.g. Microsoft Clarity) can tie steps to a single journey.
+    return {
+      ...DEFAULT_STATE,
+      sessionId: uuidv4(),
+      journeyStartTime: new Date().toISOString(),
+    };
   });
 
   // Persist to sessionStorage on every state change so data survives
@@ -129,8 +138,8 @@ export function BookingProvider({ children }) {
   const initializeSession = useCallback(() => {
     setBookingData(prev => ({
       ...prev,
-      sessionId: uuidv4(),
-      journeyStartTime: new Date().toISOString(),
+      sessionId: prev.sessionId || uuidv4(),
+      journeyStartTime: prev.journeyStartTime || new Date().toISOString(),
       journeyStatus: 'started',
     }));
   }, []);
