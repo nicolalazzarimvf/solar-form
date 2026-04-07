@@ -652,7 +652,7 @@
       postAppointmentUpdate('failed', 'postcode_not_serviceable');
       hideFullPageSubmitOverlay();
       revealIframeAfterSwap(eventObj.iFrameId);
-      revealTypMarketingRows();
+      keepTypSolarMarketingHidden();
       log('Eligible but postcode too short for outward extract', postcode);
       return;
     }
@@ -670,7 +670,7 @@
           postAppointmentUpdate('failed', 'postcode_not_serviceable');
           hideFullPageSubmitOverlay();
           revealIframeAfterSwap(eventObj.iFrameId);
-          revealTypMarketingRows();
+          keepTypSolarMarketingHidden();
           log('Postcode outward not in allowlist', outward);
           return 'denied';
         }
@@ -688,7 +688,7 @@
           postAppointmentUpdate('failed', 'no_slots');
           hideFullPageSubmitOverlay();
           revealIframeAfterSwap(eventObj.iFrameId);
-          revealTypMarketingRows();
+          keepTypSolarMarketingHidden();
           log('Eligible but no slots available; staying on TYP');
         }
       })
@@ -699,7 +699,7 @@
         postAppointmentUpdate('failed', step);
         hideFullPageSubmitOverlay();
         revealIframeAfterSwap(eventObj.iFrameId);
-        revealTypMarketingRows();
+        keepTypSolarMarketingHidden();
         log('Allowed list or slot check failed', err);
       });
   }
@@ -1441,13 +1441,80 @@
     log('What happens next section not found in DOM');
   }
 
+  function findVcRowForNode(el) {
+    var row = el.closest('.vc_row') || el.parentElement;
+    while (row && row !== document.body) {
+      if (row.classList && row.classList.contains('vc_row')) break;
+      row = row.parentElement;
+    }
+    return row && row !== document.body ? row : null;
+  }
+
+  function normalizeTypText(raw) {
+    return String(raw || '')
+      .toLowerCase()
+      .replace(/\u2019/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /** Hide TYP rows: Project Solar “matched / consultation” hero and “Why 50,000… Trust” strip. */
+  function hideTypProjectSolarPromoSections(shouldHide) {
+    var nodes = document.querySelectorAll('h1, h2, h3, h4, .vc_custom_heading, p');
+    var seenRows = [];
+    var hiddenCount = 0;
+    for (var i = 0; i < nodes.length; i += 1) {
+      var el = nodes[i];
+      var tag = (el.tagName || '').toLowerCase();
+      var t = normalizeTypText(el.textContent || '');
+      if (!t) continue;
+      if (tag === 'p' && t.length > 500) continue;
+
+      var matchHero =
+        (t.indexOf("you've been matched") !== -1 && t.indexOf('project solar') !== -1) ||
+        t.indexOf('personalised consultation') !== -1 ||
+        t.indexOf('personalized consultation') !== -1;
+      var matchTrust =
+        t.indexOf('why') !== -1 &&
+        (t.indexOf('50,000') !== -1 || t.indexOf('50000') !== -1) &&
+        t.indexOf('trust') !== -1;
+
+      if (!matchHero && !matchTrust) continue;
+
+      var row = findVcRowForNode(el);
+      if (!row) continue;
+      var already = false;
+      for (var s = 0; s < seenRows.length; s += 1) {
+        if (seenRows[s] === row) {
+          already = true;
+          break;
+        }
+      }
+      if (already) continue;
+      seenRows.push(row);
+
+      if (shouldHide) {
+        row.style.setProperty('display', 'none', 'important');
+        row.setAttribute('data-solar-optly-typ-promo-hidden', '1');
+        hiddenCount += 1;
+      } else {
+        row.style.removeProperty('display');
+        row.removeAttribute('data-solar-optly-typ-promo-hidden');
+      }
+    }
+    if (shouldHide && hiddenCount > 0) {
+      log('TYP Project Solar promo rows hidden', hiddenCount);
+    }
+  }
+
   function syncMainPageRowVisibility() {
     setMainPageRowVisibility(!!window.__solarOptlyIframeReadyForReveal);
   }
 
-  function revealTypMarketingRows() {
-    window.__solarOptlyIframeReadyForReveal = true;
+  function keepTypSolarMarketingHidden() {
+    window.__solarOptlyIframeReadyForReveal = false;
     syncMainPageRowVisibility();
+    hideTypProjectSolarPromoSections(true);
   }
 
   function watchMainPageRowVisibility() {
@@ -1466,6 +1533,9 @@
         debounceId = window.setTimeout(function () {
           debounceId = null;
           syncMainPageRowVisibility();
+          if (!window.__solarOptlyIframeReadyForReveal) {
+            hideTypProjectSolarPromoSections(true);
+          }
         }, 100);
       });
       observer.observe(document.documentElement || document.body, {
@@ -1743,7 +1813,7 @@
           log('Eligible but no postcode; cannot check slots; staying on TYP');
           hideFullPageSubmitOverlay();
           revealIframeAfterSwap(eventObj.iFrameId);
-          revealTypMarketingRows();
+          keepTypSolarMarketingHidden();
           return;
         }
         if (window.__solarOptlySlotCheckInFlight) {
@@ -1756,7 +1826,7 @@
         postAppointmentUpdate('failed', 'not_eligible');
         hideFullPageSubmitOverlay();
         revealIframeAfterSwap(eventObj.iFrameId);
-        revealTypMarketingRows();
+        keepTypSolarMarketingHidden();
         log('Submission did not match eligibility');
       }
       return;
@@ -1785,7 +1855,7 @@
           log('Eligible but no postcode; cannot check slots; staying on TYP');
           hideFullPageSubmitOverlay();
           revealIframeAfterSwap(eventObj.iFrameId);
-          revealTypMarketingRows();
+          keepTypSolarMarketingHidden();
           return;
         }
         if (window.__solarOptlySlotCheckInFlight) {
@@ -1816,7 +1886,7 @@
       } else {
         hideFullPageSubmitOverlay();
         revealIframeAfterSwap(eventObj.iFrameId);
-        revealTypMarketingRows();
+        keepTypSolarMarketingHidden();
         log('thankYouPageReached had no eligible answers and no prior qualification');
       }
     }
@@ -1959,6 +2029,7 @@
     window.__solarOptlyIframeReadyForReveal = false;
     hideIframeDuringSwap();
     syncMainPageRowVisibility();
+    hideTypProjectSolarPromoSections(true);
     watchMainPageRowVisibility();
     log('Eligible marker found on TYP, attempting iframe injection');
     swapIframeWhenReady();
@@ -1966,6 +2037,7 @@
   } else if (isTypUrl()) {
     window.__solarOptlyIframeReadyForReveal = false;
     syncMainPageRowVisibility();
+    hideTypProjectSolarPromoSections(true);
     watchMainPageRowVisibility();
     log('On TYP but no fresh eligibility marker; keeping marketing rows hidden until Chameleon completes');
   } else {
