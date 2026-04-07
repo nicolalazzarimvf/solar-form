@@ -36,6 +36,8 @@
     getAvailabilityApiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlanBianFqZnhtZWh5dmx3ZWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI2MzMwODYsImV4cCI6MjA0ODIwOTA4Nn0.8pFmhFXMPhVPkSHnVJlWDuey0FUFa0dHHkT8yvYbNJs',
     // Parent-page fetch can exceed 5s (edge cold start, TLS); race was marking no_slots falsely
     slotCheckTimeoutMs: 15000,
+    allowedOutwardCodesUrl:
+      'https://solar-form-eight.vercel.app/allowed-outward-codes.json',
     appointmentsApiUrl: 'https://sejpbjqjfxmehyvlweil.supabase.co/functions/v1/appointments',
     appointmentsApiKey: '5FVpsEtJ77rQoH3hD8jxPZSI6kIZx5WYlvvw98mRCUfvTh9yFdLXiRdFRV8cTA1O',
     requiredAnswers: {
@@ -501,6 +503,49 @@
     return '';
   }
 
+  function extractUkOutwardCode(normalizedPostcode) {
+    var pc = String(normalizedPostcode || '').replace(/\s/g, '').toUpperCase();
+    if (pc.length < 5) return '';
+    return pc.slice(0, -3);
+  }
+
+  function loadAllowedOutwardSet() {
+    if (window.__solarOptlyAllowedOutwardMap) {
+      return Promise.resolve(window.__solarOptlyAllowedOutwardMap);
+    }
+    if (window.__solarOptlyAllowedOutwardPromise) {
+      return window.__solarOptlyAllowedOutwardPromise;
+    }
+    var url = CONFIG.allowedOutwardCodesUrl;
+    window.__solarOptlyAllowedOutwardPromise = fetch(url, { credentials: 'omit', cache: 'no-cache' })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error('allowed list HTTP ' + res.status);
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        var list = data.outward;
+        if (!Array.isArray(list)) {
+          throw new Error('allowed list invalid JSON');
+        }
+        var map = {};
+        for (var i = 0; i < list.length; i += 1) {
+          map[String(list[i]).toUpperCase()] = true;
+        }
+        window.__solarOptlyAllowedOutwardMap = map;
+        window.__solarOptlyAllowedOutwardPromise = null;
+        log('Loaded allowed outward postcode count', list.length);
+        return map;
+      })
+      .catch(function (err) {
+        window.__solarOptlyAllowedOutwardPromise = null;
+        log('Failed to load allowed outward codes', err);
+        throw err;
+      });
+    return window.__solarOptlyAllowedOutwardPromise;
+  }
+
   function checkSlotsAvailable(postcode) {
     if (!postcode || typeof postcode !== 'string' || !postcode.trim()) {
       return Promise.resolve(false);
@@ -570,6 +615,68 @@
     return Promise.race([fetchPromise, timeoutPromise]).catch(function () {
       return false;
     });
+  }
+
+  function startEligibleSlotCheck(postcode, eventObj, qualifyContext) {
+    var pcNorm = String(postcode || '').replace(/\s/g, '').toUpperCase();
+    var outward = extractUkOutwardCode(pcNorm);
+    if (!outward) {
+      window.__solarOptlySlotCheckInFlight = false;
+      window.__solarOptlySlotCheckPostcode = pcNorm;
+      window.__solarOptlySlotCheckResult = {
+        hasSlots: false,
+        error: 'Invalid postcode for area check',
+        postcode: pcNorm,
+      };
+      postAppointmentUpdate('failed', 'postcode_not_serviceable');
+      hideFullPageSubmitOverlay();
+      revealIframeAfterSwap(eventObj.iFrameId);
+      log('Eligible but postcode too short for outward extract', postcode);
+      return;
+    }
+    loadAllowedOutwardSet()
+      .then(function (map) {
+        if (!map[outward]) {
+          window.__solarOptlySlotCheckInFlight = false;
+          window.__solarOptlySlotCheckPostcode = pcNorm;
+          window.__solarOptlySlotCheckResult = {
+            hasSlots: false,
+            error: 'Postcode outside service area',
+            postcode: pcNorm,
+            outward: outward,
+          };
+          postAppointmentUpdate('failed', 'postcode_not_serviceable');
+          hideFullPageSubmitOverlay();
+          revealIframeAfterSwap(eventObj.iFrameId);
+          log('Postcode outward not in allowlist', outward);
+          return 'denied';
+        }
+        postAppointmentUpdate('progressing', 'slot_check');
+        return checkSlotsAvailable(postcode);
+      })
+      .then(function (result) {
+        if (result === 'denied') return;
+        window.__solarOptlySlotCheckInFlight = false;
+        var hasSlots = result === true;
+        if (hasSlots) {
+          postAppointmentUpdate('progressing', 'qualified');
+          onQualifiedMatch(qualifyContext, eventObj);
+        } else {
+          postAppointmentUpdate('failed', 'no_slots');
+          hideFullPageSubmitOverlay();
+          revealIframeAfterSwap(eventObj.iFrameId);
+          log('Eligible but no slots available; staying on TYP');
+        }
+      })
+      .catch(function (err) {
+        window.__solarOptlySlotCheckInFlight = false;
+        var msg = String(err && err.message ? err.message : err);
+        var step = /allowed list|invalid JSON/i.test(msg) ? 'postcode_allowlist_error' : 'slot_check_error';
+        postAppointmentUpdate('failed', step);
+        hideFullPageSubmitOverlay();
+        revealIframeAfterSwap(eventObj.iFrameId);
+        log('Allowed list or slot check failed', err);
+      });
   }
 
   // --- Appointment API tracking ---
@@ -1604,25 +1711,7 @@
           return;
         }
         window.__solarOptlySlotCheckInFlight = true;
-        postAppointmentUpdate('progressing', 'slot_check');
-        checkSlotsAvailable(postcode).then(function (hasSlots) {
-          window.__solarOptlySlotCheckInFlight = false;
-          if (hasSlots) {
-            postAppointmentUpdate('progressing', 'qualified');
-            onQualifiedMatch('webform_submission_completed', eventObj);
-          } else {
-            postAppointmentUpdate('failed', 'no_slots');
-            hideFullPageSubmitOverlay();
-            revealIframeAfterSwap(eventObj.iFrameId);
-            log('Eligible but no slots available; staying on TYP');
-          }
-        }).catch(function (err) {
-          window.__solarOptlySlotCheckInFlight = false;
-          postAppointmentUpdate('failed', 'slot_check_error');
-          hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
-          log('Slot check failed', err);
-        });
+        startEligibleSlotCheck(postcode, eventObj, 'webform_submission_completed');
       } else {
         postAppointmentUpdate('failed', 'not_eligible');
         hideFullPageSubmitOverlay();
@@ -1660,25 +1749,7 @@
           return;
         }
         window.__solarOptlySlotCheckInFlight = true;
-        postAppointmentUpdate('progressing', 'slot_check');
-        checkSlotsAvailable(postcode).then(function (hasSlots) {
-          window.__solarOptlySlotCheckInFlight = false;
-          if (hasSlots) {
-            postAppointmentUpdate('progressing', 'qualified');
-            onQualifiedMatch('thankYouPageReached', eventObj);
-          } else {
-            postAppointmentUpdate('failed', 'no_slots');
-            hideFullPageSubmitOverlay();
-            revealIframeAfterSwap(eventObj.iFrameId);
-            log('Eligible but no slots available; staying on TYP');
-          }
-        }).catch(function (err) {
-          window.__solarOptlySlotCheckInFlight = false;
-          postAppointmentUpdate('failed', 'slot_check_error');
-          hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
-          log('Slot check failed', err);
-        });
+        startEligibleSlotCheck(postcode, eventObj, 'thankYouPageReached');
       } else if (window.__solarOptlyQualified || window.__solarOptlySlotCheckInFlight) {
         if (window.__solarOptlySlotCheckInFlight) {
           log('Slot check in flight; keeping overlay until it resolves');

@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/generate-allowed-postcodes.mjs && vite build",
     "preview": "vite preview",
+    "build:allowed-postcodes": "node scripts/generate-allowed-postcodes.mjs",
     "lint": "eslint src --ext js,jsx",
     "test": "vitest",
     "test:run": "vitest run",
