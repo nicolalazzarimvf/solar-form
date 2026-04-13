@@ -135,8 +135,16 @@ export function BookingProvider({ children }) {
 
   useEffect(() => {
     configureFunnelTelemetry({
-      getSubmissionId: () => bookingDataRef.current?.submissionId || '',
-      getSessionId: () => bookingDataRef.current?.sessionId || '',
+      getSubmissionId: () =>
+        bookingDataRef.current?.submissionId != null &&
+        bookingDataRef.current.submissionId !== ''
+          ? String(bookingDataRef.current.submissionId).trim()
+          : '',
+      getSessionId: () =>
+        bookingDataRef.current?.sessionId != null &&
+        bookingDataRef.current.sessionId !== ''
+          ? String(bookingDataRef.current.sessionId).trim()
+          : '',
     });
   }, []);
 

@@ -38,7 +38,9 @@ export function PrefillBridge() {
         emailAddress: answers.email_address || '',
       };
       setUserData(userData);
-      const submissionId = answers.submissionId || '';
+      const rawSid = answers.submissionId ?? answers.submission_id;
+      const submissionId =
+        rawSid != null && rawSid !== '' ? String(rawSid).trim() : '';
       updateBookingData({
         submissionId,
       });

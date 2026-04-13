@@ -15,6 +15,12 @@ let gettersRef = {
 const queue = [];
 let flushTimer = null;
 
+/** Chameleon / dataLayer may send submissionId as a number. */
+function normalizeId(value) {
+  if (value == null || value === '') return '';
+  return String(value).trim();
+}
+
 function getTelemetryConfig() {
   const url = (import.meta.env.VITE_FUNNEL_TELEMETRY_URL || '').trim();
   const key = (import.meta.env.VITE_FUNNEL_TELEMETRY_KEY || '').trim();
@@ -59,13 +65,11 @@ export function queueFunnelEvent({
   submissionIdOverride,
   sessionIdOverride,
 }) {
-  const submission_id = (
-    submissionIdOverride ??
-    gettersRef.getSubmissionId() ??
-    ''
-  ).trim();
+  const submission_id = normalizeId(
+    submissionIdOverride ?? gettersRef.getSubmissionId() ?? ''
+  );
   if (!submission_id) return;
-  const session_id = (sessionIdOverride ?? gettersRef.getSessionId() ?? '') || '';
+  const session_id = normalizeId(sessionIdOverride ?? gettersRef.getSessionId() ?? '');
   queue.push({
     submission_id,
     session_id,

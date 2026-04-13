@@ -27,7 +27,7 @@ export default function IndexPage() {
     const hasPrefill =
       bookingData.postcode || bookingData.firstName || bookingData.emailAddress;
 
-    let resolvedSubmissionId = bookingData.submissionId || '';
+    let resolvedSubmissionId = String(bookingData.submissionId ?? '').trim();
 
     if (!hasPrefill && typeof window !== 'undefined' && window.dataLayer?.answers) {
       const answers = window.dataLayer.answers;
@@ -38,8 +38,12 @@ export default function IndexPage() {
         phoneNumber: answers['phone_number'] || '',
         emailAddress: answers['email_address'] || '',
       });
+      const dlSid =
+        window.dataLayer.submissionId ?? window.dataLayer.submission_id;
       resolvedSubmissionId =
-        window.dataLayer.submissionId || window.dataLayer.submission_id || resolvedSubmissionId;
+        dlSid != null && dlSid !== ''
+          ? String(dlSid).trim()
+          : resolvedSubmissionId;
       updateBookingData({
         submissionId: resolvedSubmissionId,
       });
