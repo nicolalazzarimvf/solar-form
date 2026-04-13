@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getPool } from '@/lib/db';
+import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,12 +111,13 @@ export default async function HomePage({
               <th className="p-3 font-medium">Last type</th>
               <th className="p-3 font-medium">Last summary</th>
               <th className="p-3 font-medium">Last seen</th>
+              <th className="p-3 w-24 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && !dbError ? (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-zinc-500">
+                <td colSpan={7} className="p-6 text-center text-zinc-500">
                   No events yet. Send telemetry from the solar-form app.
                 </td>
               </tr>
@@ -141,6 +143,9 @@ export default async function HomePage({
                   </td>
                   <td className="p-3 text-xs text-zinc-600 dark:text-zinc-400">
                     {r.last_at ? new Date(r.last_at).toLocaleString() : '—'}
+                  </td>
+                  <td className="p-3 text-right">
+                    <DeleteSubmissionButton submissionId={r.submission_id} />
                   </td>
                 </tr>
               ))
