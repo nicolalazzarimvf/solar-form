@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
 import { config } from '../config/env';
 import { queueFunnelEvent, redactTelemetryObject, STEPS, supabaseEdgeMeta } from '../telemetry';
+import {
+  formatBookAppointmentApiError,
+  isUkMobileE164,
+  normalizeUkPhoneE164,
+} from '../utils/projectSolarBooking';
 import styles from './ConfirmationPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -79,20 +84,18 @@ export default function ConfirmationPage() {
         return;
       }
 
-      // Book appointment via Project Solar API (POST book-appointment)
-      // Normalize phone to E.164 UK format (+44...) for API validation.
-      // Project Solar expects customer.mobile - UK mobile (07xxx) preferred; landlines may fail validation.
-      const rawPhone = (bookingData.phoneNumber || '').trim();
-      const digits = rawPhone.replace(/\D/g, '');
-      let mobile = '';
-      if (digits.length >= 10) {
-        if (digits.startsWith('44') && digits.length >= 12) {
-          mobile = '+' + digits;
-        } else if (digits.startsWith('0') && digits.length === 11) {
-          mobile = '+44' + digits.slice(1);
-        } else if (digits.length === 10 || digits.length === 11) {
-          mobile = '+44' + (digits.startsWith('0') ? digits.slice(1) : digits);
-        }
+      // Book appointment via Project Solar API (POST book-appointment).
+      // Upstream validates customer.mobile as a UK mobile — landlines return 422 validation.phone.
+      const mobile = normalizeUkPhoneE164(bookingData.phoneNumber);
+      if (!mobile) {
+        throw new Error(
+          'Please add a UK mobile number (07…) for online booking. If you only have a landline, call 0800 112 3110.'
+        );
+      }
+      if (!isUkMobileE164(mobile)) {
+        throw new Error(
+          'Online booking requires a UK mobile (07…). Landline numbers are rejected by the installer. Update your number on the slot step or call 0800 112 3110.'
+        );
       }
 
       const bookAppointmentPayload = {
@@ -125,9 +128,7 @@ export default function ConfirmationPage() {
       if (!bookingResponse.ok) {
         const errorData = await bookingResponse.json().catch(() => ({}));
         console.error('[ERROR] Appointment booking failed:', errorData);
-        if (errorData.details) console.error('[ERROR] Validation details:', errorData.details);
-        const details = errorData.details || errorData.errors || [];
-        const detailMsg = Array.isArray(details) ? details.map(d => (typeof d === 'object' ? JSON.stringify(d) : d)).join('; ') : JSON.stringify(details);
+        const apiSummary = formatBookAppointmentApiError(errorData);
         queueFunnelEvent({
           event_type: 'api_call',
           step: STEPS.BOOK_API,
@@ -140,14 +141,16 @@ export default function ConfirmationPage() {
               postcode: bookAppointmentPayload.postcode,
               booking_date: bookAppointmentPayload.booking_date,
             },
-            response: { error: errorData.error || errorData.reason, details: detailMsg.slice(0, 2000) },
+            response: {
+              http_status: bookingResponse.status,
+              api_message: errorData.message,
+              upstream_status: errorData.upstream_status,
+              summary: apiSummary.slice(0, 2000),
+            },
             duration_ms,
           }),
         });
-        throw new Error(
-          (errorData.error || errorData.reason || 'Failed to book appointment') +
-          (detailMsg ? `: ${detailMsg}` : '')
-        );
+        throw new Error(apiSummary);
       }
 
       const bookingResult = await bookingResponse.json();
