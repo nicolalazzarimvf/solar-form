@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../contexts';
 import { config } from '../config/env';
-import { queueFunnelEvent, redactTelemetryObject } from '../telemetry';
+import { queueFunnelEvent, redactTelemetryObject, STEPS } from '../telemetry';
 import styles from './AddressPage.module.css';
 
 // Temporary flag to bypass address lookup API during UAT
@@ -79,9 +79,11 @@ export default function AddressPage() {
 
       queueFunnelEvent({
         event_type: 'api_call',
-        step: 'ideal_postcodes_lookup',
-        response_summary: `HTTP ${response.status} code ${data?.code} in ${duration_ms ?? '?'}ms`,
+        step: STEPS.ADDRESS_IDEAL_LOOKUP,
+        response_summary: `Ideal Postcodes: ${response.status}, code ${data?.code}, ${Array.isArray(data?.result) ? data.result.length : 0} addresses, ${duration_ms ?? '?'}ms`,
         payload: redactTelemetryObject({
+          api: 'ideal_postcodes_lookup',
+          route: '/address',
           request: { postcode },
           response: {
             code: data?.code,
@@ -124,9 +126,14 @@ export default function AddressPage() {
       console.error('Address lookup error:', err);
       queueFunnelEvent({
         event_type: 'api_call',
-        step: 'ideal_postcodes_lookup',
-        response_summary: `error: ${err?.message || 'unknown'}`,
-        payload: { request: { postcode }, error: String(err?.message || err) },
+        step: STEPS.ADDRESS_IDEAL_LOOKUP,
+        response_summary: `Ideal Postcodes failed: ${err?.message || 'unknown'}`,
+        payload: {
+          api: 'ideal_postcodes_lookup',
+          route: '/address',
+          request: { postcode },
+          error: String(err?.message || err),
+        },
       });
       setError('Unable to lookup addresses. Please try again or enter manually.');
     } finally {
@@ -219,9 +226,12 @@ export default function AddressPage() {
 
     queueFunnelEvent({
       event_type: 'user_action',
-      step: '/address',
-      response_summary: 'address_confirmed',
+      step: STEPS.ADDRESS_CONFIRMED,
+      response_summary: USE_MANUAL_ENTRY
+        ? 'Address confirmed (manual entry)'
+        : 'Address confirmed from list — lat/lng saved',
       payload: {
+        route: '/address',
         postcode: confirmedPostcode,
         manual: Boolean(USE_MANUAL_ENTRY),
       },

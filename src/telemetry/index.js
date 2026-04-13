@@ -6,3 +6,4 @@ export {
   slimSolarResponseForTelemetry,
 } from './funnelTelemetry';
 export { FunnelRouteTracker } from './FunnelRouteTracker';
+export { pageViewStep, STEPS } from './stepLabels';

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
-import { queueFunnelEvent } from '../telemetry';
+import { queueFunnelEvent, STEPS } from '../telemetry';
 import styles from './EligibilityQuestionsPage.module.css';
 
 const QUESTIONS = [
@@ -107,9 +107,12 @@ export default function EligibilityQuestionsPage() {
 
     queueFunnelEvent({
       event_type: 'eligibility',
-      step: '/eligibility-questions',
-      response_summary: eligible ? 'eligible' : `disqualified: ${reason}`,
+      step: STEPS.ELIGIBILITY_RESULT(eligible),
+      response_summary: eligible
+        ? 'All four eligibility questions answered — user can book a slot'
+        : `Stopped: ${reason}`,
       payload: {
+        route: '/eligibility-questions',
         eligible,
         isOver75: answers.isOver75,
         roofWorksPlanned: answers.roofWorksPlanned,

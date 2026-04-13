@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../contexts';
 import { config } from '../config/env';
-import { queueFunnelEvent, redactTelemetryObject } from '../telemetry';
+import { queueFunnelEvent, redactTelemetryObject, STEPS } from '../telemetry';
 import styles from './SlotSelectionPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -90,9 +90,14 @@ export default function SlotSelectionPage() {
       if (!response.ok) {
         queueFunnelEvent({
           event_type: 'api_call',
-          step: 'get_availability',
-          response_summary: `HTTP ${response.status}`,
-          payload: redactTelemetryObject({ request: { postcode }, duration_ms }),
+          step: STEPS.SLOTS_API,
+          response_summary: `Project Solar get-availability failed — HTTP ${response.status}`,
+          payload: redactTelemetryObject({
+            api: 'get_availability',
+            route: '/slot-selection',
+            request: { postcode },
+            duration_ms,
+          }),
         });
         throw new Error('Failed to fetch available slots');
       }
@@ -130,9 +135,11 @@ export default function SlotSelectionPage() {
 
       queueFunnelEvent({
         event_type: 'api_call',
-        step: 'get_availability',
-        response_summary: `OK · ${normalizedSlots.length} slots · ${duration_ms ?? '?'}ms`,
+        step: STEPS.SLOTS_API,
+        response_summary: `Loaded ${normalizedSlots.length} slot(s) for postcode in ${duration_ms ?? '?'}ms`,
         payload: redactTelemetryObject({
+          api: 'get_availability',
+          route: '/slot-selection',
           request: { postcode },
           response: { slotCount: normalizedSlots.length },
           duration_ms,
@@ -141,9 +148,13 @@ export default function SlotSelectionPage() {
     } catch (err) {
       queueFunnelEvent({
         event_type: 'api_call',
-        step: 'get_availability',
-        response_summary: `error: ${err?.message || err}`,
-        payload: { error: String(err?.message || err) },
+        step: STEPS.SLOTS_API,
+        response_summary: `get-availability error: ${err?.message || err}`,
+        payload: {
+          api: 'get_availability',
+          route: '/slot-selection',
+          error: String(err?.message || err),
+        },
       });
       setError('Unable to load available slots. Please try again.');
     } finally {
@@ -183,9 +194,11 @@ export default function SlotSelectionPage() {
     setSelectedSlot(slot);
     queueFunnelEvent({
       event_type: 'user_action',
-      step: '/slot-selection',
-      response_summary: 'slot_selected',
-      payload: { slotStart: slot?.startTime || null },
+      step: STEPS.SLOT_SELECTED,
+      response_summary: slot?.startTime
+        ? `Selected slot starting ${slot.startTime}`
+        : 'Selected a slot',
+      payload: { route: '/slot-selection', slotStart: slot?.startTime || null },
     });
   };
 
@@ -211,9 +224,10 @@ export default function SlotSelectionPage() {
 
     queueFunnelEvent({
       event_type: 'user_action',
-      step: '/slot-selection',
-      response_summary: 'slot_confirmed',
+      step: STEPS.SLOT_CONFIRMED,
+      response_summary: 'User confirmed slot & contact details — booking request next',
       payload: {
+        route: '/slot-selection',
         slotStart: selectedSlot?.startTime || null,
         hasLastName: Boolean(resolvedLastName),
         hasEmail: Boolean(resolvedEmail),

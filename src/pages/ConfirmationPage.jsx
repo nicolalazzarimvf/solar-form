@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
 import { config } from '../config/env';
-import { queueFunnelEvent, redactTelemetryObject } from '../telemetry';
+import { queueFunnelEvent, redactTelemetryObject, STEPS } from '../telemetry';
 import styles from './ConfirmationPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -47,9 +47,11 @@ export default function ConfirmationPage() {
       if (isDisqualified || isSessionExpired) {
         queueFunnelEvent({
           event_type: 'booking_result',
-          step: '/confirmation',
-          response_summary: isDisqualified ? 'skipped_disqualified' : 'skipped_session_expired',
-          payload: { journeyStatus: bookingData.journeyStatus },
+          step: isDisqualified ? STEPS.SKIP_DISQUALIFIED : STEPS.SKIP_SESSION_EXPIRED,
+          response_summary: isDisqualified
+            ? 'No booking API call — user already disqualified earlier'
+            : 'No booking API call — session timed out',
+          payload: { route: '/confirmation', journeyStatus: bookingData.journeyStatus },
         });
       }
       if (window.parent !== window && (isDisqualified || isSessionExpired)) {
@@ -127,9 +129,11 @@ export default function ConfirmationPage() {
         const detailMsg = Array.isArray(details) ? details.map(d => (typeof d === 'object' ? JSON.stringify(d) : d)).join('; ') : JSON.stringify(details);
         queueFunnelEvent({
           event_type: 'api_call',
-          step: 'book_appointment',
-          response_summary: `HTTP ${bookingResponse.status} in ${duration_ms ?? '?'}ms`,
+          step: STEPS.BOOK_API,
+          response_summary: `book-appointment rejected — HTTP ${bookingResponse.status}, ${duration_ms ?? '?'}ms`,
           payload: redactTelemetryObject({
+            api: 'book_appointment',
+            route: '/confirmation',
             request: {
               postcode: bookAppointmentPayload.postcode,
               booking_date: bookAppointmentPayload.booking_date,
@@ -149,9 +153,11 @@ export default function ConfirmationPage() {
 
       queueFunnelEvent({
         event_type: 'api_call',
-        step: 'book_appointment',
-        response_summary: `OK in ${duration_ms ?? '?'}ms`,
+        step: STEPS.BOOK_API,
+        response_summary: `book-appointment accepted — ${duration_ms ?? '?'}ms`,
         payload: redactTelemetryObject({
+          api: 'book_appointment',
+          route: '/confirmation',
           request: {
             postcode: bookAppointmentPayload.postcode,
             booking_date: bookAppointmentPayload.booking_date,
@@ -179,9 +185,9 @@ export default function ConfirmationPage() {
 
       queueFunnelEvent({
         event_type: 'booking_result',
-        step: '/confirmation',
-        response_summary: 'booking_confirmed',
-        payload: { bookingReference: generatedRef },
+        step: STEPS.BOOKING_CONFIRMED,
+        response_summary: `Booking confirmed — ref ${generatedRef}`,
+        payload: { route: '/confirmation', bookingReference: generatedRef },
       });
     } catch (err) {
       console.error('Booking submission failed:', err);
@@ -199,9 +205,14 @@ export default function ConfirmationPage() {
 
       queueFunnelEvent({
         event_type: 'booking_result',
-        step: '/confirmation',
-        response_summary: 'booking_failed',
+        step: STEPS.BOOKING_FAILED,
+        response_summary: isSlotUnavailable
+          ? 'Booking failed — slot no longer available'
+          : isPhoneValidation
+            ? 'Booking failed — phone/mobile validation'
+            : 'Booking failed — see error payload',
         payload: {
+          route: '/confirmation',
           error: errMsg.slice(0, 2000),
           slotUnavailable: isSlotUnavailable,
           phoneValidation: isPhoneValidation,

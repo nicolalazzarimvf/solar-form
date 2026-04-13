@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
-import { queueFunnelEvent } from '../telemetry';
+import { queueFunnelEvent, STEPS } from '../telemetry';
 import styles from './IndexPage.module.css';
 
 export default function IndexPage() {
@@ -65,9 +65,9 @@ export default function IndexPage() {
 
     queueFunnelEvent({
       event_type: 'user_action',
-      step: '/',
-      response_summary: 'book_online',
-      payload: { choice: 'book_online' },
+      step: STEPS.BOOK_ONLINE,
+      response_summary: 'User started online booking journey',
+      payload: { route: '/', choice: 'book_online' },
       submissionIdOverride: resolvedSubmissionId || bookingData.submissionId,
       sessionIdOverride: bookingData.sessionId,
     });
@@ -81,9 +81,9 @@ export default function IndexPage() {
   const handleNoThanks = () => {
     queueFunnelEvent({
       event_type: 'user_action',
-      step: '/',
-      response_summary: 'no_thanks',
-      payload: { choice: 'no_thanks' },
+      step: STEPS.NO_THANKS,
+      response_summary: 'User declined online booking — callback path',
+      payload: { route: '/', choice: 'no_thanks' },
     });
     notifyDecisionMade('no_thanks');
     updateBookingData({

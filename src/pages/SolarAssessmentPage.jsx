@@ -22,7 +22,7 @@ import {
   getSavingsDisclaimer,
   getAnnualUsageByBedrooms,
 } from '../utils/savingsCalculations';
-import { queueFunnelEvent, slimSolarResponseForTelemetry } from '../telemetry';
+import { queueFunnelEvent, slimSolarResponseForTelemetry, STEPS } from '../telemetry';
 import styles from './SolarAssessmentPage.module.css';
 
 // Temporary flag to use mock data during UAT
@@ -256,9 +256,11 @@ export default function SolarAssessmentPage() {
 
         queueFunnelEvent({
           event_type: 'api_call',
-          step: 'google_solar_building_insights',
-          response_summary: `HTTP ${response.status} in ${duration_ms ?? '?'}ms`,
+          step: STEPS.SOLAR_GOOGLE_ERR,
+          response_summary: `Google Solar API HTTP ${response.status} (${duration_ms ?? '?'}ms)`,
           payload: {
+            api: 'google_solar_building_insights',
+            route: '/solar-assessment',
             request: { latitude, longitude },
             response: { status: response.status, error: errorData?.error || null },
             duration_ms,
@@ -323,9 +325,11 @@ export default function SolarAssessmentPage() {
 
       queueFunnelEvent({
         event_type: 'api_call',
-        step: 'google_solar_building_insights',
-        response_summary: `OK ${duration_ms ?? '?'}ms · ${displayableSegments.length} displayable segments`,
+        step: STEPS.SOLAR_GOOGLE_OK,
+        response_summary: `Google Solar OK — ${displayableSegments.length} roof segment(s) to show, ${duration_ms ?? '?'}ms`,
         payload: {
+          api: 'google_solar_building_insights',
+          route: '/solar-assessment',
           request: { latitude, longitude },
           responseSummary: slimSolarResponseForTelemetry(googleData),
           displayableSegmentCount: displayableSegments.length,
@@ -337,9 +341,13 @@ export default function SolarAssessmentPage() {
 
       queueFunnelEvent({
         event_type: 'api_call',
-        step: 'google_solar_building_insights',
-        response_summary: `error: ${err?.message || err}`,
-        payload: { error: String(err?.message || err) },
+        step: STEPS.SOLAR_GOOGLE_ERR,
+        response_summary: `Google Solar failed: ${err?.message || err}`,
+        payload: {
+          api: 'google_solar_building_insights',
+          route: '/solar-assessment',
+          error: String(err?.message || err),
+        },
       });
 
       if (err.message === 'NO_COVERAGE') {
@@ -543,9 +551,9 @@ export default function SolarAssessmentPage() {
       });
       queueFunnelEvent({
         event_type: 'user_action',
-        step: '/solar-assessment',
-        response_summary: 'solar_disqualified',
-        payload: { qualified: false },
+        step: STEPS.SOLAR_DISQUALIFIED,
+        response_summary: 'Roof/panel rules not met — sent to confirmation (callback)',
+        payload: { route: '/solar-assessment', qualified: false },
       });
       navigate('/confirmation');
       return;
@@ -603,9 +611,10 @@ export default function SolarAssessmentPage() {
 
     queueFunnelEvent({
       event_type: 'user_action',
-      step: '/solar-assessment',
-      response_summary: 'solar_assessment_passed',
+      step: STEPS.SOLAR_PASSED,
+      response_summary: `Solar checks passed — ${selectedSegments.length} segment(s), ~${totalPanelCount} panels, ${Math.round(totalEstimatedEnergy)} kWh/yr est.`,
       payload: {
+        route: '/solar-assessment',
         qualified: true,
         totalPanelCount,
         totalEstimatedEnergy,
@@ -632,9 +641,9 @@ export default function SolarAssessmentPage() {
     });
     queueFunnelEvent({
       event_type: 'user_action',
-      step: '/solar-assessment',
-      response_summary: 'roof_changed_since_imagery',
-      payload: { imageryWarning: 'yes' },
+      step: STEPS.SOLAR_ROOF_CHANGED_YES,
+      response_summary: 'User said roof changed since satellite imagery — journey ended',
+      payload: { route: '/solar-assessment', imageryWarning: 'yes' },
     });
     navigate('/confirmation');
   };

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { queueFunnelEvent } from './funnelTelemetry';
+import { pageViewStep } from './stepLabels';
 
 export function FunnelRouteTracker() {
   const location = useLocation();
@@ -8,9 +9,9 @@ export function FunnelRouteTracker() {
   useEffect(() => {
     queueFunnelEvent({
       event_type: 'page_view',
-      step: location.pathname,
-      response_summary: null,
-      payload: { search: location.search || '' },
+      step: pageViewStep(location.pathname),
+      response_summary: `Opened ${location.pathname}`,
+      payload: { route: location.pathname, search: location.search || '' },
     });
   }, [location.pathname, location.search]);
 

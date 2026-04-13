@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBooking } from '../contexts';
-import { queueFunnelEvent } from '../telemetry';
+import { queueFunnelEvent, STEPS } from '../telemetry';
 
 /**
  * PrefillBridge: Receives Chameleon form answers from parent page via postMessage.
@@ -47,8 +47,8 @@ export function PrefillBridge() {
       if (submissionId) {
         queueFunnelEvent({
           event_type: 'prefill_applied',
-          step: 'prefill',
-          response_summary: 'Chameleon answers received',
+          step: STEPS.PREFILL,
+          response_summary: 'Iframe received Chameleon answers; submissionId set',
           submissionIdOverride: submissionId,
           sessionIdOverride: bookingData.sessionId,
           payload: {
