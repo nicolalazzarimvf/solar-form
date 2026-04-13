@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../contexts';
 import { config } from '../config/env';
+import { queueFunnelEvent, redactTelemetryObject } from '../telemetry';
 import styles from './AddressPage.module.css';
 
 // Temporary flag to bypass address lookup API during UAT
@@ -68,11 +69,28 @@ export default function AddressPage() {
         throw new Error('API key not configured');
       }
 
+      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       const response = await fetch(
         `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodeURIComponent(postcode)}?api_key=${apiKey}`
       );
 
       const data = await response.json();
+      const duration_ms = typeof performance !== 'undefined' ? Math.round(performance.now() - t0) : null;
+
+      queueFunnelEvent({
+        event_type: 'api_call',
+        step: 'ideal_postcodes_lookup',
+        response_summary: `HTTP ${response.status} code ${data?.code} in ${duration_ms ?? '?'}ms`,
+        payload: redactTelemetryObject({
+          request: { postcode },
+          response: {
+            code: data?.code,
+            message: data?.message,
+            resultCount: Array.isArray(data?.result) ? data.result.length : 0,
+          },
+          duration_ms,
+        }),
+      });
 
       if (data.code === 2000 && data.result && data.result.length > 0) {
         // Transform the results to a simpler format
@@ -104,6 +122,12 @@ export default function AddressPage() {
       }
     } catch (err) {
       console.error('Address lookup error:', err);
+      queueFunnelEvent({
+        event_type: 'api_call',
+        step: 'ideal_postcodes_lookup',
+        response_summary: `error: ${err?.message || 'unknown'}`,
+        payload: { request: { postcode }, error: String(err?.message || err) },
+      });
       setError('Unable to lookup addresses. Please try again or enter manually.');
     } finally {
       setIsLoading(false);
@@ -191,6 +215,16 @@ export default function AddressPage() {
       currentPage: '/solar-assessment',
       lastAction: 'address_confirmed',
       lastActionPage: '/address',
+    });
+
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step: '/address',
+      response_summary: 'address_confirmed',
+      payload: {
+        postcode: confirmedPostcode,
+        manual: Boolean(USE_MANUAL_ENTRY),
+      },
     });
 
     const addr = USE_MANUAL_ENTRY ? null : selectedAddress;

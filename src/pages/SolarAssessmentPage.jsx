@@ -22,6 +22,7 @@ import {
   getSavingsDisclaimer,
   getAnnualUsageByBedrooms,
 } from '../utils/savingsCalculations';
+import { queueFunnelEvent, slimSolarResponseForTelemetry } from '../telemetry';
 import styles from './SolarAssessmentPage.module.css';
 
 // Temporary flag to use mock data during UAT
@@ -245,11 +246,24 @@ export default function SolarAssessmentPage() {
 
       const googleSolarUrl = `https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude=${latitude}&location.longitude=${longitude}&requiredQuality=MEDIUM&key=${apiKey}`;
 
+      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       const response = await fetch(googleSolarUrl);
+      const duration_ms = typeof performance !== 'undefined' ? Math.round(performance.now() - t0) : null;
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Google Solar API error:', errorData);
+
+        queueFunnelEvent({
+          event_type: 'api_call',
+          step: 'google_solar_building_insights',
+          response_summary: `HTTP ${response.status} in ${duration_ms ?? '?'}ms`,
+          payload: {
+            request: { latitude, longitude },
+            response: { status: response.status, error: errorData?.error || null },
+            duration_ms,
+          },
+        });
 
         // Handle specific error cases
         if (response.status === 404) {
@@ -306,8 +320,27 @@ export default function SolarAssessmentPage() {
       // Auto-select all segments by default
       const allSegmentIndices = displayableSegments.map((_, index) => index);
       setSelectedSegments(allSegmentIndices);
+
+      queueFunnelEvent({
+        event_type: 'api_call',
+        step: 'google_solar_building_insights',
+        response_summary: `OK ${duration_ms ?? '?'}ms · ${displayableSegments.length} displayable segments`,
+        payload: {
+          request: { latitude, longitude },
+          responseSummary: slimSolarResponseForTelemetry(googleData),
+          displayableSegmentCount: displayableSegments.length,
+          duration_ms,
+        },
+      });
     } catch (err) {
       console.error('Solar assessment error:', err);
+
+      queueFunnelEvent({
+        event_type: 'api_call',
+        step: 'google_solar_building_insights',
+        response_summary: `error: ${err?.message || err}`,
+        payload: { error: String(err?.message || err) },
+      });
 
       if (err.message === 'NO_COVERAGE') {
         notifyParentSolarJourneyFailed('solar_no_coverage');
@@ -508,6 +541,12 @@ export default function SolarAssessmentPage() {
         lastAction: 'solar_disqualified',
         lastActionPage: '/solar-assessment',
       });
+      queueFunnelEvent({
+        event_type: 'user_action',
+        step: '/solar-assessment',
+        response_summary: 'solar_disqualified',
+        payload: { qualified: false },
+      });
       navigate('/confirmation');
       return;
     }
@@ -562,6 +601,18 @@ export default function SolarAssessmentPage() {
       lastActionPage: '/solar-assessment',
     });
 
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step: '/solar-assessment',
+      response_summary: 'solar_assessment_passed',
+      payload: {
+        qualified: true,
+        totalPanelCount,
+        totalEstimatedEnergy,
+        selectedSegmentsCount: selectedSegments.length,
+      },
+    });
+
     navigate('/eligibility-questions');
   };
 
@@ -578,6 +629,12 @@ export default function SolarAssessmentPage() {
       currentPage: '/confirmation',
       lastAction: 'roof_changed_since_imagery',
       lastActionPage: '/solar-assessment',
+    });
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step: '/solar-assessment',
+      response_summary: 'roof_changed_since_imagery',
+      payload: { imageryWarning: 'yes' },
     });
     navigate('/confirmation');
   };

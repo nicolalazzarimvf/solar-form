@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
+import { queueFunnelEvent } from '../telemetry';
 import styles from './IndexPage.module.css';
 
 export default function IndexPage() {
@@ -26,6 +27,8 @@ export default function IndexPage() {
     const hasPrefill =
       bookingData.postcode || bookingData.firstName || bookingData.emailAddress;
 
+    let resolvedSubmissionId = bookingData.submissionId || '';
+
     if (!hasPrefill && typeof window !== 'undefined' && window.dataLayer?.answers) {
       const answers = window.dataLayer.answers;
       setUserData({
@@ -35,8 +38,10 @@ export default function IndexPage() {
         phoneNumber: answers['phone_number'] || '',
         emailAddress: answers['email_address'] || '',
       });
+      resolvedSubmissionId =
+        window.dataLayer.submissionId || window.dataLayer.submission_id || resolvedSubmissionId;
       updateBookingData({
-        submissionId: window.dataLayer.submissionId || window.dataLayer.submission_id || '',
+        submissionId: resolvedSubmissionId,
       });
     } else if (!hasPrefill && import.meta.env.DEV) {
       setUserData({
@@ -54,6 +59,15 @@ export default function IndexPage() {
       lastActionPage: '/',
     });
 
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step: '/',
+      response_summary: 'book_online',
+      payload: { choice: 'book_online' },
+      submissionIdOverride: resolvedSubmissionId || bookingData.submissionId,
+      sessionIdOverride: bookingData.sessionId,
+    });
+
     // Start inactivity tracking now that the user has begun the journey
     startTracking();
 
@@ -61,6 +75,12 @@ export default function IndexPage() {
   };
 
   const handleNoThanks = () => {
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step: '/',
+      response_summary: 'no_thanks',
+      payload: { choice: 'no_thanks' },
+    });
     notifyDecisionMade('no_thanks');
     updateBookingData({
       journeyStatus: 'callback_required',

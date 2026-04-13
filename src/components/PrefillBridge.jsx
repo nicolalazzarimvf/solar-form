@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBooking } from '../contexts';
+import { queueFunnelEvent } from '../telemetry';
 
 /**
  * PrefillBridge: Receives Chameleon form answers from parent page via postMessage.
@@ -8,7 +9,7 @@ import { useBooking } from '../contexts';
  * Sends solar-optly-prefill-request on mount; parent responds with solar-optly-prefill.
  */
 export function PrefillBridge() {
-  const { setUserData, updateBookingData } = useBooking();
+  const { bookingData, setUserData, updateBookingData } = useBooking();
   const [searchParams] = useSearchParams();
   const appliedRef = useRef(false);
 
@@ -37,9 +38,26 @@ export function PrefillBridge() {
         emailAddress: answers.email_address || '',
       };
       setUserData(userData);
+      const submissionId = answers.submissionId || '';
       updateBookingData({
-        submissionId: answers.submissionId || '',
+        submissionId,
       });
+      if (submissionId) {
+        queueFunnelEvent({
+          event_type: 'prefill_applied',
+          step: 'prefill',
+          response_summary: 'Chameleon answers received',
+          submissionIdOverride: submissionId,
+          sessionIdOverride: bookingData.sessionId,
+          payload: {
+            has_first_name: Boolean(answers.first_name),
+            has_last_name: Boolean(answers.last_name),
+            has_postcode: Boolean(answers.primary_address_postalcode),
+            has_phone: Boolean(answers.phone_number),
+            has_email: Boolean(answers.email_address),
+          },
+        });
+      }
     };
 
     window.addEventListener('message', handleMessage);

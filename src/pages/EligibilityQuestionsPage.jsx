@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
+import { queueFunnelEvent } from '../telemetry';
 import styles from './EligibilityQuestionsPage.module.css';
 
 const QUESTIONS = [
@@ -103,6 +104,19 @@ export default function EligibilityQuestionsPage() {
     const { eligible, reason } = checkEligibility();
 
     setEligibilityData(answers);
+
+    queueFunnelEvent({
+      event_type: 'eligibility',
+      step: '/eligibility-questions',
+      response_summary: eligible ? 'eligible' : `disqualified: ${reason}`,
+      payload: {
+        eligible,
+        isOver75: answers.isOver75,
+        roofWorksPlanned: answers.roofWorksPlanned,
+        incomeOver15k: answers.incomeOver15k,
+        likelyToPassCreditCheck: answers.likelyToPassCreditCheck,
+      },
+    });
 
     if (window.parent !== window) {
       window.parent.postMessage({

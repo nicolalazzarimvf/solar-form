@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { configureFunnelTelemetry } from '../telemetry';
 
 const BookingContext = createContext(null);
 
@@ -115,6 +116,7 @@ function persistState(data) {
 }
 
 export function BookingProvider({ children }) {
+  const bookingDataRef = useRef(null);
   const [bookingData, setBookingData] = useState(() => {
     const persisted = loadPersistedState();
     if (persisted) {
@@ -128,6 +130,15 @@ export function BookingProvider({ children }) {
       journeyStartTime: new Date().toISOString(),
     };
   });
+
+  bookingDataRef.current = bookingData;
+
+  useEffect(() => {
+    configureFunnelTelemetry({
+      getSubmissionId: () => bookingDataRef.current?.submissionId || '',
+      getSessionId: () => bookingDataRef.current?.sessionId || '',
+    });
+  }, []);
 
   // Persist to sessionStorage on every state change so data survives
   // unexpected reloads (Safari cross-origin iframes can lose in-memory state).

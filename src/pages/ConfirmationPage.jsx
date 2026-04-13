@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
 import { config } from '../config/env';
+import { queueFunnelEvent, redactTelemetryObject } from '../telemetry';
 import styles from './ConfirmationPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -43,6 +44,14 @@ export default function ConfirmationPage() {
       submitBooking();
     } else {
       setLoading(false);
+      if (isDisqualified || isSessionExpired) {
+        queueFunnelEvent({
+          event_type: 'booking_result',
+          step: '/confirmation',
+          response_summary: isDisqualified ? 'skipped_disqualified' : 'skipped_session_expired',
+          payload: { journeyStatus: bookingData.journeyStatus },
+        });
+      }
       if (window.parent !== window && (isDisqualified || isSessionExpired)) {
         window.parent.postMessage({
           type: 'solar-optly-booking-result',
@@ -102,11 +111,13 @@ export default function ConfirmationPage() {
 
       console.log('[DEBUG] Booking appointment:', bookAppointmentPayload);
 
+      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       const bookingResponse = await fetch(`${config.projectSolarMvfApiUrl}/book-appointment`, {
         method: 'POST',
         headers: bookHeaders,
         body: JSON.stringify(bookAppointmentPayload),
       });
+      const duration_ms = typeof performance !== 'undefined' ? Math.round(performance.now() - t0) : null;
 
       if (!bookingResponse.ok) {
         const errorData = await bookingResponse.json().catch(() => ({}));
@@ -114,6 +125,19 @@ export default function ConfirmationPage() {
         if (errorData.details) console.error('[ERROR] Validation details:', errorData.details);
         const details = errorData.details || errorData.errors || [];
         const detailMsg = Array.isArray(details) ? details.map(d => (typeof d === 'object' ? JSON.stringify(d) : d)).join('; ') : JSON.stringify(details);
+        queueFunnelEvent({
+          event_type: 'api_call',
+          step: 'book_appointment',
+          response_summary: `HTTP ${bookingResponse.status} in ${duration_ms ?? '?'}ms`,
+          payload: redactTelemetryObject({
+            request: {
+              postcode: bookAppointmentPayload.postcode,
+              booking_date: bookAppointmentPayload.booking_date,
+            },
+            response: { error: errorData.error || errorData.reason, details: detailMsg.slice(0, 2000) },
+            duration_ms,
+          }),
+        });
         throw new Error(
           (errorData.error || errorData.reason || 'Failed to book appointment') +
           (detailMsg ? `: ${detailMsg}` : '')
@@ -122,6 +146,23 @@ export default function ConfirmationPage() {
 
       const bookingResult = await bookingResponse.json();
       console.log('[DEBUG] Appointment booking success:', bookingResult);
+
+      queueFunnelEvent({
+        event_type: 'api_call',
+        step: 'book_appointment',
+        response_summary: `OK in ${duration_ms ?? '?'}ms`,
+        payload: redactTelemetryObject({
+          request: {
+            postcode: bookAppointmentPayload.postcode,
+            booking_date: bookAppointmentPayload.booking_date,
+          },
+          response: {
+            booking_reference:
+              bookingResult.booking_reference || bookingResult.bookingReference || bookingResult.id,
+          },
+          duration_ms,
+        }),
+      });
 
       let generatedRef = bookingResult.booking_reference || bookingResult.bookingReference || bookingResult.id || '';
       if (!generatedRef) {
@@ -135,6 +176,13 @@ export default function ConfirmationPage() {
       setBookingConfirmed(true);
       confirmBooking(generatedRef);
       pendingSuccessRef.current = generatedRef;
+
+      queueFunnelEvent({
+        event_type: 'booking_result',
+        step: '/confirmation',
+        response_summary: 'booking_confirmed',
+        payload: { bookingReference: generatedRef },
+      });
     } catch (err) {
       console.error('Booking submission failed:', err);
       const errMsg = String(err?.message || '');
@@ -148,6 +196,17 @@ export default function ConfirmationPage() {
           error: errMsg,
         }, '*');
       }
+
+      queueFunnelEvent({
+        event_type: 'booking_result',
+        step: '/confirmation',
+        response_summary: 'booking_failed',
+        payload: {
+          error: errMsg.slice(0, 2000),
+          slotUnavailable: isSlotUnavailable,
+          phoneValidation: isPhoneValidation,
+        },
+      });
 
       if (isSlotUnavailable) {
         updateBookingData({ lastError: 'slot_unavailable' });

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../contexts';
 import { config } from '../config/env';
+import { queueFunnelEvent, redactTelemetryObject } from '../telemetry';
 import styles from './SlotSelectionPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -81,12 +82,18 @@ export default function SlotSelectionPage() {
       }
 
       const postcode = (bookingData.postcode || '').trim().replace(/\s/g, '');
-      const response = await fetch(
-        `${config.projectSolarMvfApiUrl}/get-availability?postcode=${encodeURIComponent(postcode)}`,
-        { method: 'GET' }
-      );
+      const url = `${config.projectSolarMvfApiUrl}/get-availability?postcode=${encodeURIComponent(postcode)}`;
+      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+      const response = await fetch(url, { method: 'GET' });
+      const duration_ms = typeof performance !== 'undefined' ? Math.round(performance.now() - t0) : null;
 
       if (!response.ok) {
+        queueFunnelEvent({
+          event_type: 'api_call',
+          step: 'get_availability',
+          response_summary: `HTTP ${response.status}`,
+          payload: redactTelemetryObject({ request: { postcode }, duration_ms }),
+        });
         throw new Error('Failed to fetch available slots');
       }
 
@@ -120,7 +127,24 @@ export default function SlotSelectionPage() {
       });
 
       setSlots(normalizedSlots);
+
+      queueFunnelEvent({
+        event_type: 'api_call',
+        step: 'get_availability',
+        response_summary: `OK · ${normalizedSlots.length} slots · ${duration_ms ?? '?'}ms`,
+        payload: redactTelemetryObject({
+          request: { postcode },
+          response: { slotCount: normalizedSlots.length },
+          duration_ms,
+        }),
+      });
     } catch (err) {
+      queueFunnelEvent({
+        event_type: 'api_call',
+        step: 'get_availability',
+        response_summary: `error: ${err?.message || err}`,
+        payload: { error: String(err?.message || err) },
+      });
       setError('Unable to load available slots. Please try again.');
     } finally {
       setLoading(false);
@@ -157,6 +181,12 @@ export default function SlotSelectionPage() {
 
   const handleSlotSelect = (slot) => {
     setSelectedSlot(slot);
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step: '/slot-selection',
+      response_summary: 'slot_selected',
+      payload: { slotStart: slot?.startTime || null },
+    });
   };
 
   const resolvedLastName = (bookingData.lastName || contactOverrides.lastName || '').trim();
@@ -177,6 +207,18 @@ export default function SlotSelectionPage() {
       lastAction: 'slot_confirmed',
       lastActionPage: '/slot-selection',
       journeyStatus: 'slot_confirmed',
+    });
+
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step: '/slot-selection',
+      response_summary: 'slot_confirmed',
+      payload: {
+        slotStart: selectedSlot?.startTime || null,
+        hasLastName: Boolean(resolvedLastName),
+        hasEmail: Boolean(resolvedEmail),
+        hasPhone: Boolean(resolvedPhone),
+      },
     });
 
     navigate({ pathname: '/confirmation', search: location.search });

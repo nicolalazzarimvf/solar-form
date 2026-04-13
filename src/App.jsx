@@ -5,6 +5,7 @@ import { BookingProvider, InactivityProvider } from './contexts';
 import { useBooking } from './contexts';
 import { BookingLayout, DemoPageLayout } from './components/layout';
 import { PrefillBridge } from './components/PrefillBridge';
+import { FunnelRouteTracker } from './telemetry';
 import { ClarityBridge } from './components/ClarityBridge';
 import {
   LoaderTransitionPage,
@@ -286,6 +287,7 @@ function App() {
       <BookingProvider>
         <ClarityBridge />
         <PrefillBridge />
+        <FunnelRouteTracker />
         <InactivityProvider>
           <QueryPrefillBridge />
           <Routes>
