@@ -27,11 +27,20 @@ Next.js app (Vercel) with Google OAuth for `@mvfglobal.com` users, Heroku Postgr
    - `VITE_FUNNEL_TELEMETRY_URL=https://YOUR_DASHBOARD_DOMAIN/api/telemetry`
    - `VITE_FUNNEL_TELEMETRY_KEY` = same value as `TELEMETRY_INGEST_SECRET`
 
-## Deploy on Vercel
+## Deploy on Vercel (second project — do not change solar-form’s root)
 
-Create a **second** Vercel project with **Root Directory** = `apps/funnel-dashboard`.
+The solar-form app must keep **Root Directory** empty (repo root). This dashboard needs its **own** Vercel project pointing at the subfolder.
 
-Add the same environment variables as production (including `AUTH_URL` = your dashboard URL).
+1. [Vercel Dashboard](https://vercel.com) → **Add New…** → **Project**.
+2. **Import** the same Git repository as solar-form (e.g. `nicolalazzarimvf/solar-form`).
+3. Before deploying, open **Configure Project**:
+   - **Root Directory** → **Edit** → select **`apps/funnel-dashboard`** (folder contains `package.json` with Next.js).
+   - Framework preset should be **Next.js** (this repo includes [`vercel.json`](vercel.json) to pin install/build).
+4. **Environment Variables** — add every key from [`.env.example`](.env.example) for **Production** (and **Preview** if you use previews). Set **`AUTH_URL`** to `https://<this-project>.vercel.app` after you know the URL (update Google OAuth redirect URI to match).
+5. **Deploy**. Copy the production URL into Google Cloud OAuth redirect / solar-form `VITE_FUNNEL_TELEMETRY_URL`.
+
+**CLI (optional):** from repo root, with a [token](https://vercel.com/account/tokens):  
+`cd apps/funnel-dashboard && npx vercel link` then `npx vercel deploy --prod`
 
 ## Test ingest (curl)
 
