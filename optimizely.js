@@ -32,12 +32,15 @@
       'div.vc_row.wpb_row.vc_row-fluid.background-position-center-center',
     hiddenMainPageRowIndexes: [0, 2], // Hide/show only 1st and 3rd matches
     heightDebug: false,
+    // Staging: use https://wppwuqfrvtvtnfgwxnbd.supabase.co/functions/v1 (+ matching anon key from that project).
     getAvailabilityApiUrl: 'https://sejpbjqjfxmehyvlweil.supabase.co/functions/v1',
     getAvailabilityApiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlanBianFqZnhtZWh5dmx3ZWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI2MzMwODYsImV4cCI6MjA0ODIwOTA4Nn0.8pFmhFXMPhVPkSHnVJlWDuey0FUFa0dHHkT8yvYbNJs',
     // Parent-page fetch can exceed 5s (edge cold start, TLS); race was marking no_slots falsely
     slotCheckTimeoutMs: 15000,
     allowedOutwardCodesUrl:
       'https://solar-form-eight.vercel.app/allowed-outward-codes.json',
+    // Must stay in sync with VITE_PROJECT_SOLAR_MVF_API_URL: {base}/appointments
+    // Staging: https://wppwuqfrvtvtnfgwxnbd.supabase.co/functions/v1/appointments (+ MVF x-api-key for that project).
     appointmentsApiUrl: 'https://sejpbjqjfxmehyvlweil.supabase.co/functions/v1/appointments',
     appointmentsApiKey: '5FVpsEtJ77rQoH3hD8jxPZSI6kIZx5WYlvvw98mRCUfvTh9yFdLXiRdFRV8cTA1O',
     requiredAnswers: {

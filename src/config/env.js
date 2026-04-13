@@ -16,9 +16,10 @@ export const config = {
   // Ideal Postcodes API
   idealPostcodesApiKey: import.meta.env.VITE_IDEAL_POSTCODES_API_KEY || '',
 
-  // Project Solar API (book-appointment, get-availability)
+  // MVF Supabase functions base (same project as optimizely CONFIG.getAvailabilityApiUrl).
+  // React: get-availability, book-appointment. Parent: .../appointments/{submissionId} (see optimizely.js).
   projectSolarMvfApiUrl: import.meta.env.VITE_PROJECT_SOLAR_MVF_API_URL || 'https://sejpbjqjfxmehyvlweil.supabase.co/functions/v1',
-  projectSolarMvfApiKey: import.meta.env.VITE_PROJECT_SOLAR_MVF_API_KEY || '5FVpsEtJ77rQoH3hD8jxPZSI6kIZx5WYlvvw98mRCUfvTh9yFdLXiRdFRV8cTA1O',
+  projectSolarMvfApiKey: import.meta.env.VITE_PROJECT_SOLAR_MVF_API_KEY || '',
 
   // Environment
   isDev: import.meta.env.DEV,
