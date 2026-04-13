@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
 import { config } from '../config/env';
-import { queueFunnelEvent, redactTelemetryObject, STEPS } from '../telemetry';
+import { queueFunnelEvent, redactTelemetryObject, STEPS, supabaseEdgeMeta } from '../telemetry';
 import styles from './ConfirmationPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -113,8 +113,9 @@ export default function ConfirmationPage() {
 
       console.log('[DEBUG] Booking appointment:', bookAppointmentPayload);
 
+      const bookEdgeFn = 'book-appointment';
       const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-      const bookingResponse = await fetch(`${config.projectSolarMvfApiUrl}/book-appointment`, {
+      const bookingResponse = await fetch(`${config.projectSolarMvfApiUrl}/${bookEdgeFn}`, {
         method: 'POST',
         headers: bookHeaders,
         body: JSON.stringify(bookAppointmentPayload),
@@ -130,8 +131,9 @@ export default function ConfirmationPage() {
         queueFunnelEvent({
           event_type: 'api_call',
           step: STEPS.BOOK_API,
-          response_summary: `book-appointment rejected — HTTP ${bookingResponse.status}, ${duration_ms ?? '?'}ms`,
+          response_summary: `Supabase ${bookEdgeFn} rejected — HTTP ${bookingResponse.status}, ${duration_ms ?? '?'}ms`,
           payload: redactTelemetryObject({
+            ...supabaseEdgeMeta(bookEdgeFn),
             api: 'book_appointment',
             route: '/confirmation',
             request: {
@@ -154,8 +156,9 @@ export default function ConfirmationPage() {
       queueFunnelEvent({
         event_type: 'api_call',
         step: STEPS.BOOK_API,
-        response_summary: `book-appointment accepted — ${duration_ms ?? '?'}ms`,
+        response_summary: `Supabase ${bookEdgeFn} accepted — ${duration_ms ?? '?'}ms`,
         payload: redactTelemetryObject({
+          ...supabaseEdgeMeta(bookEdgeFn),
           api: 'book_appointment',
           route: '/confirmation',
           request: {

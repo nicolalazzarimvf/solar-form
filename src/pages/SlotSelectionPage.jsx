@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../contexts';
 import { config } from '../config/env';
-import { queueFunnelEvent, redactTelemetryObject, STEPS } from '../telemetry';
+import { queueFunnelEvent, redactTelemetryObject, STEPS, supabaseEdgeMeta } from '../telemetry';
 import styles from './SlotSelectionPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -82,7 +82,8 @@ export default function SlotSelectionPage() {
       }
 
       const postcode = (bookingData.postcode || '').trim().replace(/\s/g, '');
-      const url = `${config.projectSolarMvfApiUrl}/get-availability?postcode=${encodeURIComponent(postcode)}`;
+      const edgeFn = 'get-availability';
+      const url = `${config.projectSolarMvfApiUrl}/${edgeFn}?postcode=${encodeURIComponent(postcode)}`;
       const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       const response = await fetch(url, { method: 'GET' });
       const duration_ms = typeof performance !== 'undefined' ? Math.round(performance.now() - t0) : null;
@@ -91,8 +92,9 @@ export default function SlotSelectionPage() {
         queueFunnelEvent({
           event_type: 'api_call',
           step: STEPS.SLOTS_API,
-          response_summary: `Project Solar get-availability failed — HTTP ${response.status}`,
+          response_summary: `Supabase ${edgeFn} failed — HTTP ${response.status}`,
           payload: redactTelemetryObject({
+            ...supabaseEdgeMeta(edgeFn),
             api: 'get_availability',
             route: '/slot-selection',
             request: { postcode },
@@ -136,8 +138,9 @@ export default function SlotSelectionPage() {
       queueFunnelEvent({
         event_type: 'api_call',
         step: STEPS.SLOTS_API,
-        response_summary: `Loaded ${normalizedSlots.length} slot(s) for postcode in ${duration_ms ?? '?'}ms`,
+        response_summary: `Supabase ${edgeFn} OK — ${normalizedSlots.length} slot(s) in ${duration_ms ?? '?'}ms`,
         payload: redactTelemetryObject({
+          ...supabaseEdgeMeta(edgeFn),
           api: 'get_availability',
           route: '/slot-selection',
           request: { postcode },
@@ -149,8 +152,9 @@ export default function SlotSelectionPage() {
       queueFunnelEvent({
         event_type: 'api_call',
         step: STEPS.SLOTS_API,
-        response_summary: `get-availability error: ${err?.message || err}`,
+        response_summary: `Supabase get-availability error: ${err?.message || err}`,
         payload: {
+          ...supabaseEdgeMeta('get-availability'),
           api: 'get_availability',
           route: '/slot-selection',
           error: String(err?.message || err),

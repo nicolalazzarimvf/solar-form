@@ -7,3 +7,4 @@ export {
 } from './funnelTelemetry';
 export { FunnelRouteTracker } from './FunnelRouteTracker';
 export { pageViewStep, STEPS } from './stepLabels';
+export { supabaseEdgeMeta } from './supabaseEdgeMeta';

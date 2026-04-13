@@ -38,11 +38,11 @@ export const STEPS = {
       ? 'Eligibility: Passed — load appointment slots'
       : 'Eligibility: Disqualified — exit to confirmation',
 
-  SLOTS_API: 'Slots: Load availability (Project Solar get-availability)',
+  SLOTS_API: 'Slots: Supabase edge — get-availability (Project Solar)',
   SLOT_SELECTED: 'Slots: Time slot selected',
   SLOT_CONFIRMED: 'Slots: Appointment confirmed — go to booking',
 
-  BOOK_API: 'Confirmation: Submit booking (Project Solar book-appointment)',
+  BOOK_API: 'Confirmation: Supabase edge — book-appointment (Project Solar)',
   BOOKING_CONFIRMED: 'Confirmation: Booking succeeded',
   BOOKING_FAILED: 'Confirmation: Booking failed (callback / retry)',
   SKIP_DISQUALIFIED: 'Confirmation: Skipped booking (disqualified earlier)',
