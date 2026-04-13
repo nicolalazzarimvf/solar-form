@@ -1,5 +1,8 @@
 -- Heroku Postgres / any PostgreSQL 14+
--- Run once: psql $DATABASE_URL -f db/migrations/001_journey_events.sql
+-- Run once (direct URL, not pooler): psql "$DATABASE_URL" -f db/migrations/001_journey_events.sql
+--
+-- Serverless (Vercel): set DATABASE_URL to Heroku *connection pooling* URL (port 6543) on the
+-- dashboard project so many isolates share a small server limit. Optional: DATABASE_POOL_MAX=1
 
 CREATE TABLE IF NOT EXISTS journey_events (
   id BIGSERIAL PRIMARY KEY,
