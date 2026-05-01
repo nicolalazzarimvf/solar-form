@@ -2,10 +2,8 @@ import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
 import { fetchSubmissionList } from '@/lib/submissionListQuery';
-import {
-  submissionFiltersFromSearchParams,
-  type SubmissionSearchParams,
-} from '@/lib/resolveSubmissionFilters';
+import { BILLY_QUICK_GROUPS } from '@/lib/submissionFilterPresets';
+import { resolveSubmissionListFilters, type SubmissionSearchParams } from '@/lib/resolveSubmissionFilters';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +15,9 @@ export default async function HomePage({
   searchParams: Promise<SubmissionSearchParams>;
 }) {
   const sp = await searchParams;
-  const filters = submissionFiltersFromSearchParams(sp);
+  const { activePreset, filters } = resolveSubmissionListFilters(sp);
   const hasActiveFilters =
+    activePreset !== '' ||
     Boolean((filters.q ?? '').trim()) ||
     Boolean((filters.date_from ?? '').trim()) ||
     Boolean((filters.date_to ?? '').trim());
@@ -38,48 +37,105 @@ export default async function HomePage({
       </h1>
       <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         Latest activity by Chameleon <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">submissionId</code>
-        . Events are recorded from the solar booking iframe after prefill. Filter by ID (partial match) and/or last
-        activity date; open a row for the full event timeline.
+        . Events are recorded from the solar booking iframe after prefill. Quick picks either match the{' '}
+        <strong className="font-medium text-zinc-800 dark:text-zinc-200">latest event</strong> only (booking outcome,
+        confirmation page, slots page, “by event type”) or{' '}
+        <strong className="font-medium text-zinc-800 dark:text-zinc-200">any earlier event</strong> for thank-you
+        choices, hard exits, and progress milestones — see each box. Below that, filter by submission ID (partial
+        match) and/or last activity date; open a row for the full event timeline.
       </p>
 
-      <form method="get" className="mb-6 flex flex-wrap items-end gap-3">
-        <input
-          name="q"
-          type="search"
-          placeholder="Submission ID…"
-          defaultValue={filters.q ?? ''}
-          className="min-w-[200px] flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
-        />
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Last activity from
+      <form method="get" className="mb-6 space-y-4">
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+          <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Quick filters</h2>
+          <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-600 dark:bg-zinc-950">
+            <input
+              type="radio"
+              name="billy_preset"
+              value=""
+              defaultChecked={activePreset === ''}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-zinc-900 dark:text-zinc-100">None</span>
+              <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+                Use submission ID and date range only (below).
+              </span>
+            </span>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {BILLY_QUICK_GROUPS.map((group) => (
+              <div
+                key={group.title}
+                className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-950"
+              >
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+                  {group.title}
+                </h3>
+                {group.description ? (
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{group.description}</p>
+                ) : null}
+                <div className="mt-3 space-y-2">
+                  {group.options.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex cursor-pointer items-start gap-2 rounded-md border border-transparent px-1 py-0.5 text-sm hover:border-zinc-200 hover:bg-zinc-50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+                    >
+                      <input
+                        type="radio"
+                        name="billy_preset"
+                        value={opt.value}
+                        defaultChecked={activePreset === opt.value}
+                        className="mt-1"
+                      />
+                      <span className="text-zinc-800 dark:text-zinc-200">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
           <input
-            name="date_from"
-            type="date"
-            defaultValue={filters.date_from ?? ''}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            name="q"
+            type="search"
+            placeholder="Submission ID…"
+            defaultValue={filters.q ?? ''}
+            className="min-w-[200px] flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Last activity to
-          <input
-            name="date_to"
-            type="date"
-            defaultValue={filters.date_to ?? ''}
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-          />
-        </label>
-        <button
-          type="submit"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          Apply filters
-        </button>
-        <Link
-          href="/"
-          className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 dark:border-zinc-600 dark:text-zinc-300"
-        >
-          Clear
-        </Link>
+          <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            Last activity from
+            <input
+              name="date_from"
+              type="date"
+              defaultValue={filters.date_from ?? ''}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            Last activity to
+            <input
+              name="date_to"
+              type="date"
+              defaultValue={filters.date_to ?? ''}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            Apply filters
+          </button>
+          <Link
+            href="/"
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 dark:border-zinc-600 dark:text-zinc-300"
+          >
+            Clear
+          </Link>
+        </div>
       </form>
 
       {dbError && (
