@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
+import {
+  EVENT_TYPE_OPTIONS,
+  isPresetEventType,
+  isPresetStep,
+  STEP_OPTION_GROUPS,
+} from '@/lib/submissionFilterPresets';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +27,15 @@ export type SubmissionListFilters = {
   date_from?: string;
   date_to?: string;
 };
+
+function mergeStepFilter(sp: {
+  step?: string;
+  step_custom?: string;
+}): string {
+  const custom = (sp.step_custom ?? '').trim();
+  const selected = (sp.step ?? '').trim();
+  return custom || selected;
+}
 
 /** YYYY-MM-DD only; returns undefined if invalid or empty. */
 function parseDateParam(value: string | undefined): string | undefined {
@@ -105,16 +120,19 @@ async function fetchSubmissions(filters: SubmissionListFilters): Promise<Row[]> 
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<SubmissionListFilters>;
+  searchParams: Promise<SubmissionListFilters & { step_custom?: string }>;
 }) {
   const sp = await searchParams;
   const filters: SubmissionListFilters = {
     q: sp.q,
-    step: sp.step,
+    step: mergeStepFilter(sp),
     event_type: sp.event_type,
     date_from: sp.date_from,
     date_to: sp.date_to,
   };
+  const stepForSelect = isPresetStep(filters.step) ? filters.step : '';
+  const stepCustomDefault =
+    filters.step && !isPresetStep(filters.step) ? filters.step : '';
   let rows: Row[] = [];
   let dbError: string | null = null;
   try {
@@ -134,7 +152,7 @@ export default async function HomePage({
       </p>
 
       <form method="get" className="mb-6 space-y-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <input
             name="q"
             type="search"
@@ -142,20 +160,54 @@ export default async function HomePage({
             defaultValue={filters.q ?? ''}
             className="min-w-[160px] flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
           />
-          <input
-            name="step"
-            type="search"
-            placeholder="Last step (contains)…"
-            defaultValue={filters.step ?? ''}
-            className="min-w-[200px] flex-[2] rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
-          />
-          <input
-            name="event_type"
-            type="search"
-            placeholder="Last event type…"
-            defaultValue={filters.event_type ?? ''}
-            className="min-w-[140px] flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
-          />
+          <label className="flex min-w-[220px] max-w-full flex-[2] flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            Last step
+            <select
+              name="step"
+              defaultValue={stepForSelect}
+              className="max-w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <option value="">Any</option>
+              {STEP_OPTION_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            Custom step contains
+            <input
+              name="step_custom"
+              type="search"
+              placeholder="Overrides dropdown…"
+              defaultValue={stepCustomDefault}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+              autoComplete="off"
+            />
+          </label>
+          <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            Last event type
+            <select
+              name="event_type"
+              defaultValue={filters.event_type ?? ''}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <option value="">Any</option>
+              {EVENT_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+              {filters.event_type && !isPresetEventType(filters.event_type) ? (
+                <option value={filters.event_type}>{filters.event_type} (from URL)</option>
+              ) : null}
+            </select>
+          </label>
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
