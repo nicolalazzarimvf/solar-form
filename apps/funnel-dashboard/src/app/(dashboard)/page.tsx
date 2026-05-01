@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
+import { fetchLast7DaysRecap } from '@/lib/last7DaysRecap';
 import { fetchSubmissionList } from '@/lib/submissionListQuery';
 import { BILLY_QUICK_GROUPS } from '@/lib/submissionFilterPresets';
 import { resolveSubmissionListFilters, type SubmissionSearchParams } from '@/lib/resolveSubmissionFilters';
@@ -23,12 +24,21 @@ export default async function HomePage({
     Boolean((filters.date_to ?? '').trim());
 
   let rows: Awaited<ReturnType<typeof fetchSubmissionList>> = [];
+  let recap: Awaited<ReturnType<typeof fetchLast7DaysRecap>> | null = null;
   let dbError: string | null = null;
   try {
-    rows = await fetchSubmissionList(getPool(), filters);
+    const pool = getPool();
+    rows = await fetchSubmissionList(pool, filters);
+    try {
+      recap = await fetchLast7DaysRecap(pool);
+    } catch {
+      recap = null;
+    }
   } catch (e) {
     dbError = e instanceof Error ? e.message : 'Database error';
   }
+
+  const fmt = (n: number) => new Intl.NumberFormat().format(n);
 
   return (
     <div>
@@ -94,6 +104,49 @@ export default async function HomePage({
                 </div>
               </div>
             ))}
+            <div className="col-span-1 flex flex-col rounded-lg border border-emerald-200/80 bg-emerald-50/60 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30 sm:col-span-2 xl:col-span-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-300">
+                Last 7 days (recap)
+              </h3>
+              <p className="mt-1 text-xs text-emerald-800/90 dark:text-emerald-400/90">
+                Rolling window from the database clock — same telemetry as this list.
+              </p>
+              {recap ? (
+                <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3 sm:gap-3">
+                  <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                    <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      Last activity in window
+                    </dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                      {fmt(recap.submissionsLastActive)}{' '}
+                      <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
+                    </dd>
+                  </div>
+                  <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                    <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      New journeys
+                    </dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                      {fmt(recap.submissionsNew)}{' '}
+                      <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
+                    </dd>
+                  </div>
+                  <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50 sm:col-span-1">
+                    <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      Events logged
+                    </dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                      {fmt(recap.eventsLogged)}{' '}
+                      <span className="font-normal text-zinc-600 dark:text-zinc-400">rows</span>
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                  {dbError ? 'Connect the database to see recap stats.' : 'Recap unavailable.'}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
