@@ -1,34 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { BILLY_QUICK_GROUPS, BILLY_QUICK_MAP } from './submissionFilterPresets';
 import {
-  mergeStepFilter,
   parseDateParam,
-  resolveSubmissionListFilters,
+  submissionFiltersFromSearchParams,
 } from './resolveSubmissionFilters';
-
-describe('mergeStepFilter', () => {
-  it('prefers step_custom over dropdown step', () => {
-    expect(
-      mergeStepFilter({
-        step: 'Thank-you: Book online',
-        step_custom: 'Confirmation:',
-      })
-    ).toBe('Confirmation:');
-  });
-
-  it('uses step when custom empty', () => {
-    expect(
-      mergeStepFilter({
-        step: 'Page: Loader / handover',
-        step_custom: '   ',
-      })
-    ).toBe('Page: Loader / handover');
-  });
-
-  it('returns empty when both empty', () => {
-    expect(mergeStepFilter({})).toBe('');
-  });
-});
 
 describe('parseDateParam', () => {
   it('accepts valid YYYY-MM-DD', () => {
@@ -46,96 +20,26 @@ describe('parseDateParam', () => {
   });
 });
 
-describe('resolveSubmissionListFilters', () => {
-  it('uses manual step and event_type when no preset', () => {
-    const { activePreset, filters } = resolveSubmissionListFilters({
-      step: 'Thank-you: Book online',
-      event_type: 'user_action',
-    });
-    expect(activePreset).toBe('');
-    expect(filters.step).toBe('Thank-you: Book online');
-    expect(filters.event_type).toBe('user_action');
-  });
-
-  it('applies thank_book_online preset (any-event; ignores stale URL step/type)', () => {
-    const { activePreset, filters } = resolveSubmissionListFilters({
-      billy_preset: 'thank_book_online',
-      step: 'Page: Confirm address (postcode & property)',
-      event_type: 'page_view',
-    });
-    expect(activePreset).toBe('thank_book_online');
-    expect(filters.step).toBe('');
-    expect(filters.event_type).toBe('');
-    expect(filters.any_event).toEqual({
-      step: 'Thank-you: Book online',
-      event_type: 'user_action',
+describe('submissionFiltersFromSearchParams', () => {
+  it('passes q and dates', () => {
+    expect(
+      submissionFiltersFromSearchParams({
+        q: ' 102859 ',
+        date_from: '2026-04-01',
+        date_to: '2026-04-30',
+      })
+    ).toEqual({
+      q: ' 102859 ',
+      date_from: '2026-04-01',
+      date_to: '2026-04-30',
     });
   });
 
-  it('applies eligibility_disqualified preset with any-event match', () => {
-    const { filters } = resolveSubmissionListFilters({ billy_preset: 'eligibility_disqualified' });
-    expect(filters.any_event).toEqual({
-      step: 'Eligibility: Disqualified — exit to confirmation',
-      event_type: 'eligibility',
+  it('allows empty object', () => {
+    expect(submissionFiltersFromSearchParams({})).toEqual({
+      q: undefined,
+      date_from: undefined,
+      date_to: undefined,
     });
-    expect(filters.step).toBe('');
-    expect(filters.event_type).toBe('');
-  });
-
-  it('ignores manual step/event when preset only sets event_type', () => {
-    const { filters } = resolveSubmissionListFilters({
-      billy_preset: 'et_page_view',
-      step: 'Page: Choose appointment slot',
-      step_custom: '',
-      event_type: 'user_action',
-    });
-    expect(filters.event_type).toBe('page_view');
-    expect(filters.step).toBe('');
-  });
-
-  it('passes q and dates while preset clears conflicting manual step', () => {
-    const { filters } = resolveSubmissionListFilters({
-      billy_preset: 'et_booking_result',
-      q: '10285',
-      date_from: '2026-01-01',
-      step: 'Page: Booking confirmation / outcome',
-      event_type: 'page_view',
-    });
-    expect(filters.q).toBe('10285');
-    expect(filters.date_from).toBe('2026-01-01');
-    expect(filters.step).toBe('');
-    expect(filters.event_type).toBe('booking_result');
-  });
-
-  it('ignores unknown billy_preset', () => {
-    const { activePreset, filters } = resolveSubmissionListFilters({
-      billy_preset: 'not_a_real_key',
-      step: '',
-      event_type: 'prefill_applied',
-    });
-    expect(activePreset).toBe('');
-    expect(filters.event_type).toBe('prefill_applied');
-  });
-
-  it('passes through q and dates unchanged', () => {
-    const { filters } = resolveSubmissionListFilters({
-      q: 'abc-123',
-      date_from: '2026-01-10',
-      date_to: '2026-01-20',
-      billy_preset: '',
-    });
-    expect(filters.q).toBe('abc-123');
-    expect(filters.date_from).toBe('2026-01-10');
-    expect(filters.date_to).toBe('2026-01-20');
-  });
-});
-
-describe('BILLY_QUICK_GROUPS ↔ BILLY_QUICK_MAP', () => {
-  it('every quick-filter radio value has a map entry', () => {
-    for (const group of BILLY_QUICK_GROUPS) {
-      for (const opt of group.options) {
-        expect(BILLY_QUICK_MAP[opt.value], `missing preset: ${opt.value}`).toBeDefined();
-      }
-    }
   });
 });

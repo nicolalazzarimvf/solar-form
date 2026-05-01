@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
-import { resolveSubmissionListFilters } from './resolveSubmissionFilters';
+import { submissionFiltersFromSearchParams } from './resolveSubmissionFilters';
 import {
   buildSubmissionListWhereClause,
   countMatchingSubmissions,
@@ -27,10 +27,6 @@ async function countViaExistsAggregate(pool: Pool, filters: SubmissionListFilter
   return Number(rows[0]?.n ?? 0);
 }
 
-/**
- * Independent count: latest event per submission (DISTINCT ON + id tie-break),
- * same filters as the dashboard query after alias mapping.
- */
 async function countLatestViaDistinctOn(
   pool: Pool,
   filters: SubmissionListFilters
@@ -74,7 +70,7 @@ function sslForUrl(url: string): boolean | { rejectUnauthorized: boolean } {
 }
 
 describe.skipIf(!hasDbUrl)(
-  'submission filters vs PostgreSQL (integration)',
+  'submission list query vs PostgreSQL (integration)',
   { timeout: 60_000 },
   () => {
     let pool: Pool;
@@ -107,45 +103,18 @@ describe.skipIf(!hasDbUrl)(
     }
 
     it('matches reference with no filters', async () => {
-      await assertCountsMatch({});
+      await assertCountsMatch(submissionFiltersFromSearchParams({}));
     });
 
-    it('matches reference for booking_succeeded quick preset', async () => {
-      const { filters } = resolveSubmissionListFilters({ billy_preset: 'booking_succeeded' });
-      await assertCountsMatch(filters);
-    });
-
-    it('matches reference for thank_book_online quick preset', async () => {
-      const { filters } = resolveSubmissionListFilters({ billy_preset: 'thank_book_online' });
-      await assertCountsMatch(filters);
-    });
-
-    it('matches reference for eligibility_disqualified (any-event preset)', async () => {
-      const { filters } = resolveSubmissionListFilters({ billy_preset: 'eligibility_disqualified' });
-      await assertCountsMatch(filters);
-    });
-
-    it('matches reference for et_page_view (event type only)', async () => {
-      const { filters } = resolveSubmissionListFilters({ billy_preset: 'et_page_view' });
-      await assertCountsMatch(filters);
-    });
-
-    it('matches reference for page_confirmation (reached confirmation page)', async () => {
-      const { filters } = resolveSubmissionListFilters({ billy_preset: 'page_confirmation' });
-      await assertCountsMatch(filters);
-    });
-
-    it('matches reference for manual step + event_type', async () => {
-      await assertCountsMatch({
-        step: 'Confirmation: Booking succeeded',
-        event_type: 'booking_result',
-      });
+    it('matches reference for submission id contains', async () => {
+      await assertCountsMatch(submissionFiltersFromSearchParams({ q: '0' }));
     });
 
     it('fetchSubmissionList length equals count when under LIMIT', async () => {
-      const { filters } = resolveSubmissionListFilters({ billy_preset: 'booking_succeeded' });
+      const filters = submissionFiltersFromSearchParams({});
       const total = await countMatchingSubmissions(pool, filters);
       const rows = await fetchSubmissionList(pool, filters, { limit: 500 });
       expect(rows.length).toBe(Math.min(total, 500));
     });
-  });
+  }
+);
