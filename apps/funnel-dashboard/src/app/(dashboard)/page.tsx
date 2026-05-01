@@ -14,15 +14,63 @@ type Row = {
   last_summary: string | null;
 };
 
-async function fetchSubmissions(q: string | undefined): Promise<Row[]> {
+export type SubmissionListFilters = {
+  q?: string;
+  step?: string;
+  event_type?: string;
+  date_from?: string;
+  date_to?: string;
+};
+
+/** YYYY-MM-DD only; returns undefined if invalid or empty. */
+function parseDateParam(value: string | undefined): string | undefined {
+  const v = (value ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return undefined;
+  const d = new Date(`${v}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return v;
+}
+
+async function fetchSubmissions(filters: SubmissionListFilters): Promise<Row[]> {
   const pool = getPool();
-  const search = (q ?? '').trim();
+  const search = (filters.q ?? '').trim();
+  const step = (filters.step ?? '').trim();
+  const eventType = (filters.event_type ?? '').trim();
+  const dateFrom = parseDateParam(filters.date_from);
+  const dateTo = parseDateParam(filters.date_to);
+
+  const conditions: string[] = [];
   const params: string[] = [];
-  let where = '';
+  let i = 1;
+
   if (search) {
+    conditions.push(`s.submission_id ILIKE $${i}`);
     params.push(`%${search}%`);
-    where = 'WHERE submission_id ILIKE $1';
+    i += 1;
   }
+  if (step) {
+    conditions.push(`e.step ILIKE $${i}`);
+    params.push(`%${step}%`);
+    i += 1;
+  }
+  if (eventType) {
+    conditions.push(`e.event_type ILIKE $${i}`);
+    params.push(`%${eventType}%`);
+    i += 1;
+  }
+  if (dateFrom) {
+    conditions.push(`s.last_at >= $${i}::date`);
+    params.push(dateFrom);
+    i += 1;
+  }
+  if (dateTo) {
+    conditions.push(`s.last_at < ($${i}::date + interval '1 day')`);
+    params.push(dateTo);
+    i += 1;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
   const sql = `
     SELECT s.submission_id,
            s.event_count::text,
@@ -57,13 +105,20 @@ async function fetchSubmissions(q: string | undefined): Promise<Row[]> {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<SubmissionListFilters>;
 }) {
-  const { q } = await searchParams;
+  const sp = await searchParams;
+  const filters: SubmissionListFilters = {
+    q: sp.q,
+    step: sp.step,
+    event_type: sp.event_type,
+    date_from: sp.date_from,
+    date_to: sp.date_to,
+  };
   let rows: Row[] = [];
   let dbError: string | null = null;
   try {
-    rows = await fetchSubmissions(q);
+    rows = await fetchSubmissions(filters);
   } catch (e) {
     dbError = e instanceof Error ? e.message : 'Database error';
   }
@@ -78,20 +133,62 @@ export default async function HomePage({
         . Events are recorded from the solar booking iframe after prefill.
       </p>
 
-      <form method="get" className="mb-6 flex flex-wrap gap-2">
-        <input
-          name="q"
-          type="search"
-          placeholder="Filter by submission ID…"
-          defaultValue={q ?? ''}
-          className="min-w-[200px] flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
-        />
-        <button
-          type="submit"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          Search
-        </button>
+      <form method="get" className="mb-6 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <input
+            name="q"
+            type="search"
+            placeholder="Submission ID…"
+            defaultValue={filters.q ?? ''}
+            className="min-w-[160px] flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+          />
+          <input
+            name="step"
+            type="search"
+            placeholder="Last step (contains)…"
+            defaultValue={filters.step ?? ''}
+            className="min-w-[200px] flex-[2] rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+          />
+          <input
+            name="event_type"
+            type="search"
+            placeholder="Last event type…"
+            defaultValue={filters.event_type ?? ''}
+            className="min-w-[140px] flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+          />
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            Last activity from
+            <input
+              name="date_from"
+              type="date"
+              defaultValue={filters.date_from ?? ''}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            Last activity to
+            <input
+              name="date_to"
+              type="date"
+              defaultValue={filters.date_to ?? ''}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            Apply filters
+          </button>
+          <Link
+            href="/"
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 dark:border-zinc-600 dark:text-zinc-300"
+          >
+            Clear
+          </Link>
+        </div>
       </form>
 
       {dbError && (
