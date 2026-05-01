@@ -37,6 +37,10 @@ export function buildSubmissionListWhereClause(filters: SubmissionListFilters): 
   const search = (filters.q ?? '').trim();
   const step = (filters.step ?? '').trim();
   const eventType = (filters.event_type ?? '').trim();
+  const anyEv = filters.any_event;
+  const anyStep = (anyEv?.step ?? '').trim();
+  const anyEt = (anyEv?.event_type ?? '').trim();
+  const useAnyEvent = Boolean(anyStep || anyEt);
   const dateFrom = parseDateParam(filters.date_from);
   const dateTo = parseDateParam(filters.date_to);
 
@@ -49,15 +53,30 @@ export function buildSubmissionListWhereClause(filters: SubmissionListFilters): 
     params.push(`%${search}%`);
     i += 1;
   }
-  if (step) {
-    conditions.push(`e.step ILIKE $${i}`);
-    params.push(`%${step}%`);
-    i += 1;
-  }
-  if (eventType) {
-    conditions.push(`e.event_type ILIKE $${i}`);
-    params.push(`%${eventType}%`);
-    i += 1;
+  if (useAnyEvent) {
+    const existsParts = ['j.submission_id = s.submission_id'];
+    if (anyStep) {
+      existsParts.push(`j.step ILIKE $${i}`);
+      params.push(`%${anyStep}%`);
+      i += 1;
+    }
+    if (anyEt) {
+      existsParts.push(`j.event_type ILIKE $${i}`);
+      params.push(`%${anyEt}%`);
+      i += 1;
+    }
+    conditions.push(`EXISTS (SELECT 1 FROM journey_events j WHERE ${existsParts.join(' AND ')})`);
+  } else {
+    if (step) {
+      conditions.push(`e.step ILIKE $${i}`);
+      params.push(`%${step}%`);
+      i += 1;
+    }
+    if (eventType) {
+      conditions.push(`e.event_type ILIKE $${i}`);
+      params.push(`%${eventType}%`);
+      i += 1;
+    }
   }
   if (dateFrom) {
     conditions.push(`s.last_at >= $${i}::date`);

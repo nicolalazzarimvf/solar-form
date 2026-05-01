@@ -11,6 +11,22 @@ import type { SubmissionListFilters } from './resolveSubmissionFilters';
 
 const hasDbUrl = Boolean(process.env.DATABASE_URL?.trim());
 
+/** Reference count for filters that use EXISTS (any-event match). */
+async function countViaExistsAggregate(pool: Pool, filters: SubmissionListFilters): Promise<number> {
+  const { whereClause, params } = buildSubmissionListWhereClause(filters);
+  const sql = `
+    SELECT COUNT(*)::bigint AS n
+    FROM (
+      SELECT submission_id, MAX(created_at) AS last_at
+      FROM journey_events
+      GROUP BY submission_id
+    ) s
+    ${whereClause}
+  `;
+  const { rows } = await pool.query<{ n: string }>(sql, params.length ? params : undefined);
+  return Number(rows[0]?.n ?? 0);
+}
+
 /**
  * Independent count: latest event per submission (DISTINCT ON + id tie-break),
  * same filters as the dashboard query after alias mapping.
@@ -77,9 +93,15 @@ describe.skipIf(!hasDbUrl)(
     });
 
     async function assertCountsMatch(filters: SubmissionListFilters) {
+      const ae = filters.any_event;
+      const useExistsRef =
+        ae && ((ae.step ?? '').trim() || (ae.event_type ?? '').trim());
+      const ref = useExistsRef
+        ? countViaExistsAggregate(pool, filters)
+        : countLatestViaDistinctOn(pool, filters);
       const [appCount, refCount] = await Promise.all([
         countMatchingSubmissions(pool, filters),
-        countLatestViaDistinctOn(pool, filters),
+        ref,
       ]);
       expect(appCount, `app count ${appCount} vs reference ${refCount}`).toBe(refCount);
     }
@@ -95,6 +117,11 @@ describe.skipIf(!hasDbUrl)(
 
     it('matches reference for thank_book_online quick preset', async () => {
       const { filters } = resolveSubmissionListFilters({ billy_preset: 'thank_book_online' });
+      await assertCountsMatch(filters);
+    });
+
+    it('matches reference for eligibility_disqualified (any-event preset)', async () => {
+      const { filters } = resolveSubmissionListFilters({ billy_preset: 'eligibility_disqualified' });
       await assertCountsMatch(filters);
     });
 

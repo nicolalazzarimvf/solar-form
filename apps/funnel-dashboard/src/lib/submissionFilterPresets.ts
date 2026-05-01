@@ -92,17 +92,23 @@ export function isPresetStep(value: string | undefined): boolean {
   return PRESET_STEP_SET.has(value);
 }
 
-/** Maps GET param `billy_preset` → last-step filters (partial overrides manual dropdowns). */
-export type BillyQuickSlice = Partial<{ step: string; event_type: string }>;
+/** Maps GET param `billy_preset` → filters. `anyEventMatch`: row may be buried after a later page_view (navigation). */
+export type BillyQuickSlice = Partial<{
+  step: string;
+  event_type: string;
+  anyEventMatch: boolean;
+}>;
 
 export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
   thank_book_online: {
     step: 'Thank-you: Book online',
     event_type: 'user_action',
+    anyEventMatch: true,
   },
   thank_no_thanks: {
     step: 'Thank-you: No thanks — callback offer',
     event_type: 'user_action',
+    anyEventMatch: true,
   },
   booking_succeeded: {
     step: 'Confirmation: Booking succeeded',
@@ -123,22 +129,27 @@ export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
   solar_disqualified: {
     step: 'Solar: Did not meet roof/panel rules — exit',
     event_type: 'user_action',
+    anyEventMatch: true,
   },
   eligibility_disqualified: {
     step: 'Eligibility: Disqualified — exit to confirmation',
     event_type: 'eligibility',
+    anyEventMatch: true,
   },
   roof_changed: {
     step: 'Solar: Roof changed since imagery — journey ended',
     event_type: 'user_action',
+    anyEventMatch: true,
   },
   eligibility_passed: {
     step: 'Eligibility: Passed — load appointment slots',
     event_type: 'eligibility',
+    anyEventMatch: true,
   },
   slot_confirmed: {
     step: 'Slots: Appointment confirmed — go to booking',
     event_type: 'user_action',
+    anyEventMatch: true,
   },
   page_slots: {
     step: 'Page: Choose appointment slot',
@@ -163,7 +174,8 @@ export type BillyQuickGroup = {
 export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
   {
     title: 'Choice on the thank-you screen',
-    description: 'Matches users whose latest event is this decision.',
+    description:
+      'Matches if this choice was recorded at any point (the next page usually adds a newer page_view).',
     options: [
       { value: 'thank_book_online', label: 'Book online' },
       { value: 'thank_no_thanks', label: 'No thanks — callback' },
@@ -186,6 +198,8 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
   },
   {
     title: 'Hard exits',
+    description:
+      'Matches if this exit was recorded at any point. Users are sent to /confirmation next, so the latest event is often a page_view, not the exit row.',
     options: [
       { value: 'solar_disqualified', label: 'Solar — roof/panel rules not met' },
       { value: 'eligibility_disqualified', label: 'Eligibility — disqualified' },
@@ -194,6 +208,8 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
   },
   {
     title: 'Progress signals',
+    description:
+      'Matches if this milestone occurred at any point (navigation usually adds a newer page_view afterward).',
     options: [
       { value: 'eligibility_passed', label: 'Eligibility passed' },
       { value: 'slot_confirmed', label: 'Slot confirmed — go to booking' },

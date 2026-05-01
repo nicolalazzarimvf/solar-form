@@ -47,8 +47,11 @@ export default async function HomePage({
       </h1>
       <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         Latest activity by Chameleon <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">submissionId</code>
-        . Events are recorded from the solar booking iframe after prefill. Quick picks filter by{' '}
-        <strong className="font-medium text-zinc-800 dark:text-zinc-200">last event</strong> per submission.
+        . Events come from the solar booking iframe after prefill. Quick picks either match the{' '}
+        <strong className="font-medium text-zinc-800 dark:text-zinc-200">latest event</strong> only (booking outcome,
+        confirmation page, slots page, “by event type”) or{' '}
+        <strong className="font-medium text-zinc-800 dark:text-zinc-200">any earlier event</strong> for thank-you
+        choices, hard exits, and progress milestones — see each box.
       </p>
 
       <form method="get" className="mb-6 space-y-4">
@@ -222,11 +225,10 @@ export default async function HomePage({
                 <td colSpan={7} className="p-6 text-center text-zinc-500">
                   {hasActiveFilters ? (
                     <>
-                      No submissions match these filters. Quick picks use{' '}
-                      <strong className="font-medium text-zinc-700 dark:text-zinc-300">
-                        last event only
-                      </strong>{' '}
-                      per submission (e.g. a later page view hides an older “booking succeeded”). Try{' '}
+                      No submissions match these filters. Check the quick-filter box text: some require the{' '}
+                      <strong className="font-medium text-zinc-700 dark:text-zinc-300">latest event</strong>
+                      , others match a milestone at{' '}
+                      <strong className="font-medium text-zinc-700 dark:text-zinc-300">any point</strong>. Try{' '}
                       <Link href="/" className="underline">
                         Clear
                       </Link>{' '}

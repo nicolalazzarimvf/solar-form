@@ -57,15 +57,29 @@ describe('resolveSubmissionListFilters', () => {
     expect(filters.event_type).toBe('user_action');
   });
 
-  it('applies thank_book_online preset', () => {
+  it('applies thank_book_online preset (any-event; ignores stale URL step/type)', () => {
     const { activePreset, filters } = resolveSubmissionListFilters({
       billy_preset: 'thank_book_online',
       step: 'Page: Confirm address (postcode & property)',
       event_type: 'page_view',
     });
     expect(activePreset).toBe('thank_book_online');
-    expect(filters.step).toBe('Thank-you: Book online');
-    expect(filters.event_type).toBe('user_action');
+    expect(filters.step).toBe('');
+    expect(filters.event_type).toBe('');
+    expect(filters.any_event).toEqual({
+      step: 'Thank-you: Book online',
+      event_type: 'user_action',
+    });
+  });
+
+  it('applies eligibility_disqualified preset with any-event match', () => {
+    const { filters } = resolveSubmissionListFilters({ billy_preset: 'eligibility_disqualified' });
+    expect(filters.any_event).toEqual({
+      step: 'Eligibility: Disqualified — exit to confirmation',
+      event_type: 'eligibility',
+    });
+    expect(filters.step).toBe('');
+    expect(filters.event_type).toBe('');
   });
 
   it('ignores manual step/event when preset only sets event_type', () => {

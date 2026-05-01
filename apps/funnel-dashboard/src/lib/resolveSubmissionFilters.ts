@@ -6,6 +6,8 @@ export type SubmissionListFilters = {
   event_type?: string;
   date_from?: string;
   date_to?: string;
+  /** Match submissions that have at least one event matching (ILIKE), not only the latest row. */
+  any_event?: { step?: string; event_type?: string };
 };
 
 export type SubmissionSearchParams = SubmissionListFilters & {
@@ -44,12 +46,16 @@ export function resolveSubmissionListFilters(sp: SubmissionSearchParams): {
 
   if (activePreset) {
     const slice = BILLY_QUICK_MAP[activePreset];
+    const useAny = Boolean(slice.anyEventMatch);
     return {
       activePreset,
       filters: {
         q: sp.q,
-        step: slice.step !== undefined ? slice.step : '',
-        event_type: slice.event_type !== undefined ? slice.event_type : '',
+        step: useAny ? '' : slice.step !== undefined ? slice.step : '',
+        event_type: useAny ? '' : slice.event_type !== undefined ? slice.event_type : '',
+        any_event: useAny
+          ? { step: slice.step ?? '', event_type: slice.event_type ?? '' }
+          : undefined,
         date_from: sp.date_from,
         date_to: sp.date_to,
       },
@@ -62,6 +68,7 @@ export function resolveSubmissionListFilters(sp: SubmissionSearchParams): {
       q: sp.q,
       step: mergeStepFilter(sp),
       event_type: (sp.event_type ?? '').trim(),
+      any_event: undefined,
       date_from: sp.date_from,
       date_to: sp.date_to,
     },
