@@ -91,3 +91,129 @@ export function isPresetStep(value: string | undefined): boolean {
   if (!value) return false;
   return PRESET_STEP_SET.has(value);
 }
+
+/** Maps GET param `billy_preset` → last-step filters (partial overrides manual dropdowns). */
+export type BillyQuickSlice = Partial<{ step: string; event_type: string }>;
+
+export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
+  thank_book_online: {
+    step: 'Thank-you: Book online',
+    event_type: 'user_action',
+  },
+  thank_no_thanks: {
+    step: 'Thank-you: No thanks — callback offer',
+    event_type: 'user_action',
+  },
+  booking_succeeded: {
+    step: 'Confirmation: Booking succeeded',
+    event_type: 'booking_result',
+  },
+  booking_failed: {
+    step: 'Confirmation: Booking failed (callback / retry)',
+    event_type: 'booking_result',
+  },
+  skip_disqualified: {
+    step: 'Confirmation: Skipped booking (disqualified earlier)',
+    event_type: 'booking_result',
+  },
+  skip_session_expired: {
+    step: 'Confirmation: Skipped booking (session expired)',
+    event_type: 'booking_result',
+  },
+  solar_disqualified: {
+    step: 'Solar: Did not meet roof/panel rules — exit',
+    event_type: 'user_action',
+  },
+  eligibility_disqualified: {
+    step: 'Eligibility: Disqualified — exit to confirmation',
+    event_type: 'eligibility',
+  },
+  roof_changed: {
+    step: 'Solar: Roof changed since imagery — journey ended',
+    event_type: 'user_action',
+  },
+  eligibility_passed: {
+    step: 'Eligibility: Passed — load appointment slots',
+    event_type: 'eligibility',
+  },
+  slot_confirmed: {
+    step: 'Slots: Appointment confirmed — go to booking',
+    event_type: 'user_action',
+  },
+  page_slots: {
+    step: 'Page: Choose appointment slot',
+    event_type: 'page_view',
+  },
+  page_confirmation: {
+    step: 'Page: Booking confirmation / outcome',
+    event_type: 'page_view',
+  },
+  et_booking_result: { event_type: 'booking_result' },
+  et_user_action: { event_type: 'user_action' },
+  et_page_view: { event_type: 'page_view' },
+};
+
+export type BillyQuickGroup = {
+  title: string;
+  description?: string;
+  options: { value: string; label: string }[];
+};
+
+/** Visual grouping only — every `value` must exist in `BILLY_QUICK_MAP`. */
+export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
+  {
+    title: 'Choice on the thank-you screen',
+    description: 'Matches users whose latest event is this decision.',
+    options: [
+      { value: 'thank_book_online', label: 'Book online' },
+      { value: 'thank_no_thanks', label: 'No thanks — callback' },
+    ],
+  },
+  {
+    title: 'Booking outcome',
+    options: [
+      { value: 'booking_succeeded', label: 'Booking succeeded' },
+      { value: 'booking_failed', label: 'Booking failed (callback / retry)' },
+      { value: 'skip_disqualified', label: 'Skipped — disqualified earlier' },
+      { value: 'skip_session_expired', label: 'Skipped — session expired' },
+    ],
+  },
+  {
+    title: 'Hard exits',
+    options: [
+      { value: 'solar_disqualified', label: 'Solar — roof/panel rules not met' },
+      { value: 'eligibility_disqualified', label: 'Eligibility — disqualified' },
+      { value: 'roof_changed', label: 'Solar — roof changed since imagery' },
+    ],
+  },
+  {
+    title: 'Progress signals',
+    options: [
+      { value: 'eligibility_passed', label: 'Eligibility passed' },
+      { value: 'slot_confirmed', label: 'Slot confirmed — go to booking' },
+    ],
+  },
+  {
+    title: 'Stopped on page (last event)',
+    description: 'Latest event is a page view on this step.',
+    options: [
+      { value: 'page_slots', label: 'Choose appointment slot' },
+      { value: 'page_confirmation', label: 'Booking confirmation / outcome' },
+    ],
+  },
+  {
+    title: 'By last event type',
+    description: 'Any last step with this event type.',
+    options: [
+      { value: 'et_booking_result', label: 'booking_result' },
+      { value: 'et_user_action', label: 'user_action' },
+      { value: 'et_page_view', label: 'page_view' },
+    ],
+  },
+];
+
+export function normalizeBillyPresetKey(raw: string | undefined): string {
+  const key = (raw ?? '').trim();
+  if (!key || !BILLY_QUICK_MAP[key]) return '';
+  return key;
+}

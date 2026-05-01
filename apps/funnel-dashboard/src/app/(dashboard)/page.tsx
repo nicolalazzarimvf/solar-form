@@ -2,9 +2,12 @@ import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
 import {
+  BILLY_QUICK_GROUPS,
+  BILLY_QUICK_MAP,
   EVENT_TYPE_OPTIONS,
   isPresetEventType,
   isPresetStep,
+  normalizeBillyPresetKey,
   STEP_OPTION_GROUPS,
 } from '@/lib/submissionFilterPresets';
 
@@ -120,13 +123,25 @@ async function fetchSubmissions(filters: SubmissionListFilters): Promise<Row[]> 
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<SubmissionListFilters & { step_custom?: string }>;
+  searchParams: Promise<
+    SubmissionListFilters & { step_custom?: string; billy_preset?: string }
+  >;
 }) {
   const sp = await searchParams;
+  const activePreset = normalizeBillyPresetKey(sp.billy_preset);
+
+  let resolvedStep = mergeStepFilter(sp);
+  let resolvedEventType = (sp.event_type ?? '').trim();
+  if (activePreset) {
+    const slice = BILLY_QUICK_MAP[activePreset];
+    if (slice.step !== undefined) resolvedStep = slice.step;
+    if (slice.event_type !== undefined) resolvedEventType = slice.event_type;
+  }
+
   const filters: SubmissionListFilters = {
     q: sp.q,
-    step: mergeStepFilter(sp),
-    event_type: sp.event_type,
+    step: resolvedStep,
+    event_type: resolvedEventType,
     date_from: sp.date_from,
     date_to: sp.date_to,
   };
@@ -148,10 +163,64 @@ export default async function HomePage({
       </h1>
       <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         Latest activity by Chameleon <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">submissionId</code>
-        . Events are recorded from the solar booking iframe after prefill.
+        . Events are recorded from the solar booking iframe after prefill. Quick picks filter by{' '}
+        <strong className="font-medium text-zinc-800 dark:text-zinc-200">last event</strong> per submission.
       </p>
 
-      <form method="get" className="mb-6 space-y-3">
+      <form method="get" className="mb-6 space-y-4">
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+          <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Quick filters
+          </h2>
+          <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-600 dark:bg-zinc-950">
+            <input
+              type="radio"
+              name="billy_preset"
+              value=""
+              defaultChecked={activePreset === ''}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-zinc-900 dark:text-zinc-100">None</span>
+              <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+                Use the dropdowns and custom fields below.
+              </span>
+            </span>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {BILLY_QUICK_GROUPS.map((group) => (
+              <div
+                key={group.title}
+                className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-950"
+              >
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+                  {group.title}
+                </h3>
+                {group.description ? (
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{group.description}</p>
+                ) : null}
+                <div className="mt-3 space-y-2">
+                  {group.options.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex cursor-pointer items-start gap-2 rounded-md border border-transparent px-1 py-0.5 text-sm hover:border-zinc-200 hover:bg-zinc-50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+                    >
+                      <input
+                        type="radio"
+                        name="billy_preset"
+                        value={opt.value}
+                        defaultChecked={activePreset === opt.value}
+                        className="mt-1"
+                      />
+                      <span className="text-zinc-800 dark:text-zinc-200">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-end gap-2">
           <input
             name="q"
