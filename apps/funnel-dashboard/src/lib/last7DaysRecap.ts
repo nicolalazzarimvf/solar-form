@@ -13,8 +13,6 @@ function ilikeContains(value: string): string {
 }
 
 export type Last7DaysRecap = {
-  /** Distinct submissions whose latest event falls in the rolling 7-day window. */
-  submissionsLastActive: number;
   /** Distinct submissions whose first event falls in the window (new journeys). */
   submissionsNew: number;
   /** Total `journey_events` rows in the window. */
@@ -36,14 +34,11 @@ export type Last7DaysRecap = {
 
 const SUMMARY_SQL = `
   WITH agg AS (
-    SELECT submission_id,
-           MIN(created_at) AS first_at,
-           MAX(created_at) AS last_at
+    SELECT submission_id, MIN(created_at) AS first_at
     FROM journey_events
     GROUP BY submission_id
   )
   SELECT
-    (SELECT COUNT(*)::bigint FROM agg WHERE last_at >= NOW() - INTERVAL '7 days') AS submissions_last_active,
     (SELECT COUNT(*)::bigint FROM agg WHERE first_at >= NOW() - INTERVAL '7 days') AS submissions_new,
     (SELECT COUNT(*)::bigint FROM journey_events WHERE created_at >= NOW() - INTERVAL '7 days') AS events_logged
 `;
@@ -108,7 +103,6 @@ export async function fetchLast7DaysRecap(pool: Pool): Promise<Last7DaysRecap> {
 
   const [summaryRes, outcomesRes] = await Promise.all([
     pool.query<{
-      submissions_last_active: string;
       submissions_new: string;
       events_logged: string;
     }>(SUMMARY_SQL),
@@ -123,7 +117,6 @@ export async function fetchLast7DaysRecap(pool: Pool): Promise<Last7DaysRecap> {
   const o = outcomesRes.rows[0];
 
   return {
-    submissionsLastActive: Number(s?.submissions_last_active ?? 0),
     submissionsNew: Number(s?.submissions_new ?? 0),
     eventsLogged: Number(s?.events_logged ?? 0),
     bookingSucceeded: Number(o?.booking_succeeded ?? 0),

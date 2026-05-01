@@ -109,21 +109,12 @@ export default async function HomePage({
                 Last 7 days (recap)
               </h3>
               <p className="mt-1 text-xs text-emerald-800/90 dark:text-emerald-400/90">
-                Rolling window from the database clock — same telemetry as this list. Counts below use last activity in
-                the window; click a funnel metric to apply the matching quick filter.
+                Rolling window from the database clock — same telemetry as this list. Funnel counts use submissions with
+                last activity in the window; click a metric to apply the matching quick filter.
               </p>
               {recap ? (
                 <>
-                  <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3 sm:gap-3">
-                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
-                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Last activity in window
-                      </dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                        {fmt(recap.submissionsLastActive)}{' '}
-                        <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
-                      </dd>
-                    </div>
+                  <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2 sm:gap-3">
                     <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
                       <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         New journeys
@@ -133,7 +124,7 @@ export default async function HomePage({
                         <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
                       </dd>
                     </div>
-                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50 sm:col-span-1">
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
                       <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         Events logged
                       </dt>
