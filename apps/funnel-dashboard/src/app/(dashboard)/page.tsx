@@ -1,157 +1,41 @@
 import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
+import { fetchSubmissionList } from '@/lib/submissionListQuery';
 import {
   BILLY_QUICK_GROUPS,
-  BILLY_QUICK_MAP,
   EVENT_TYPE_OPTIONS,
   isPresetEventType,
   isPresetStep,
-  normalizeBillyPresetKey,
   STEP_OPTION_GROUPS,
 } from '@/lib/submissionFilterPresets';
+import { resolveSubmissionListFilters, type SubmissionSearchParams } from '@/lib/resolveSubmissionFilters';
 
 export const dynamic = 'force-dynamic';
 
-type Row = {
-  submission_id: string;
-  event_count: string;
-  first_at: Date;
-  last_at: Date;
-  last_step: string;
-  last_event_type: string;
-  last_summary: string | null;
-};
-
-export type SubmissionListFilters = {
-  q?: string;
-  step?: string;
-  event_type?: string;
-  date_from?: string;
-  date_to?: string;
-};
-
-function mergeStepFilter(sp: {
-  step?: string;
-  step_custom?: string;
-}): string {
-  const custom = (sp.step_custom ?? '').trim();
-  const selected = (sp.step ?? '').trim();
-  return custom || selected;
-}
-
-/** YYYY-MM-DD only; returns undefined if invalid or empty. */
-function parseDateParam(value: string | undefined): string | undefined {
-  const v = (value ?? '').trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return undefined;
-  const d = new Date(`${v}T12:00:00Z`);
-  if (Number.isNaN(d.getTime())) return undefined;
-  return v;
-}
-
-async function fetchSubmissions(filters: SubmissionListFilters): Promise<Row[]> {
-  const pool = getPool();
-  const search = (filters.q ?? '').trim();
-  const step = (filters.step ?? '').trim();
-  const eventType = (filters.event_type ?? '').trim();
-  const dateFrom = parseDateParam(filters.date_from);
-  const dateTo = parseDateParam(filters.date_to);
-
-  const conditions: string[] = [];
-  const params: string[] = [];
-  let i = 1;
-
-  if (search) {
-    conditions.push(`s.submission_id ILIKE $${i}`);
-    params.push(`%${search}%`);
-    i += 1;
-  }
-  if (step) {
-    conditions.push(`e.step ILIKE $${i}`);
-    params.push(`%${step}%`);
-    i += 1;
-  }
-  if (eventType) {
-    conditions.push(`e.event_type ILIKE $${i}`);
-    params.push(`%${eventType}%`);
-    i += 1;
-  }
-  if (dateFrom) {
-    conditions.push(`s.last_at >= $${i}::date`);
-    params.push(dateFrom);
-    i += 1;
-  }
-  if (dateTo) {
-    conditions.push(`s.last_at < ($${i}::date + interval '1 day')`);
-    params.push(dateTo);
-    i += 1;
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  const sql = `
-    SELECT s.submission_id,
-           s.event_count::text,
-           s.first_at,
-           s.last_at,
-           e.step AS last_step,
-           e.event_type AS last_event_type,
-           e.response_summary AS last_summary
-    FROM (
-      SELECT submission_id,
-             COUNT(*)::int AS event_count,
-             MIN(created_at) AS first_at,
-             MAX(created_at) AS last_at
-      FROM journey_events
-      GROUP BY submission_id
-    ) s
-    JOIN LATERAL (
-      SELECT step, event_type, response_summary
-      FROM journey_events j
-      WHERE j.submission_id = s.submission_id
-      ORDER BY j.created_at DESC
-      LIMIT 1
-    ) e ON true
-    ${where}
-    ORDER BY s.last_at DESC
-    LIMIT 200
-  `;
-  const { rows } = await pool.query<Row>(sql, params.length ? params : undefined);
-  return rows;
-}
+export type { SubmissionListFilters } from '@/lib/resolveSubmissionFilters';
 
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<
-    SubmissionListFilters & { step_custom?: string; billy_preset?: string }
-  >;
+  searchParams: Promise<SubmissionSearchParams>;
 }) {
   const sp = await searchParams;
-  const activePreset = normalizeBillyPresetKey(sp.billy_preset);
-
-  let resolvedStep = mergeStepFilter(sp);
-  let resolvedEventType = (sp.event_type ?? '').trim();
-  if (activePreset) {
-    const slice = BILLY_QUICK_MAP[activePreset];
-    if (slice.step !== undefined) resolvedStep = slice.step;
-    if (slice.event_type !== undefined) resolvedEventType = slice.event_type;
-  }
-
-  const filters: SubmissionListFilters = {
-    q: sp.q,
-    step: resolvedStep,
-    event_type: resolvedEventType,
-    date_from: sp.date_from,
-    date_to: sp.date_to,
-  };
+  const { activePreset, filters } = resolveSubmissionListFilters(sp);
   const stepForSelect = isPresetStep(filters.step) ? filters.step : '';
   const stepCustomDefault =
     filters.step && !isPresetStep(filters.step) ? filters.step : '';
-  let rows: Row[] = [];
+  const hasActiveFilters =
+    activePreset !== '' ||
+    Boolean((filters.q ?? '').trim()) ||
+    Boolean((filters.step ?? '').trim()) ||
+    Boolean((filters.event_type ?? '').trim()) ||
+    Boolean((filters.date_from ?? '').trim()) ||
+    Boolean((filters.date_to ?? '').trim());
+  let rows: Awaited<ReturnType<typeof fetchSubmissionList>> = [];
   let dbError: string | null = null;
   try {
-    rows = await fetchSubmissions(filters);
+    rows = await fetchSubmissionList(getPool(), filters);
   } catch (e) {
     dbError = e instanceof Error ? e.message : 'Database error';
   }
@@ -336,7 +220,23 @@ export default async function HomePage({
             {rows.length === 0 && !dbError ? (
               <tr>
                 <td colSpan={7} className="p-6 text-center text-zinc-500">
-                  No events yet. Send telemetry from the solar-form app.
+                  {hasActiveFilters ? (
+                    <>
+                      No submissions match these filters. Quick picks use{' '}
+                      <strong className="font-medium text-zinc-700 dark:text-zinc-300">
+                        last event only
+                      </strong>{' '}
+                      per submission (e.g. a later page view hides an older “booking succeeded”). Try{' '}
+                      <Link href="/" className="underline">
+                        Clear
+                      </Link>{' '}
+                      or check this deployment&apos;s{' '}
+                      <code className="rounded bg-zinc-100 px-1 text-xs dark:bg-zinc-800">DATABASE_URL</code>{' '}
+                      matches the database where telemetry is written.
+                    </>
+                  ) : (
+                    <>No events yet. Send telemetry from the solar-form app.</>
+                  )}
                 </td>
               </tr>
             ) : (

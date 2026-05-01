@@ -179,6 +179,12 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
     ],
   },
   {
+    title: 'Confirmation page',
+    description:
+      'Last event is a page view on /confirmation. Matches “reached confirmation”; “Booking succeeded” needs API success as the latest event.',
+    options: [{ value: 'page_confirmation', label: 'Reached confirmation page' }],
+  },
+  {
     title: 'Hard exits',
     options: [
       { value: 'solar_disqualified', label: 'Solar — roof/panel rules not met' },
@@ -196,10 +202,7 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
   {
     title: 'Stopped on page (last event)',
     description: 'Latest event is a page view on this step.',
-    options: [
-      { value: 'page_slots', label: 'Choose appointment slot' },
-      { value: 'page_confirmation', label: 'Booking confirmation / outcome' },
-    ],
+    options: [{ value: 'page_slots', label: 'Choose appointment slot' }],
   },
   {
     title: 'By last event type',
