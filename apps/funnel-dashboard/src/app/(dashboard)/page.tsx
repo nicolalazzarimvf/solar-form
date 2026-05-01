@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
-import { fetchLast7DaysRecap } from '@/lib/last7DaysRecap';
+import { fetchLast7DaysRecap, RECAP_CLICK_PRESETS } from '@/lib/last7DaysRecap';
 import { fetchSubmissionList } from '@/lib/submissionListQuery';
 import { BILLY_QUICK_GROUPS } from '@/lib/submissionFilterPresets';
 import { resolveSubmissionListFilters, type SubmissionSearchParams } from '@/lib/resolveSubmissionFilters';
@@ -109,38 +109,88 @@ export default async function HomePage({
                 Last 7 days (recap)
               </h3>
               <p className="mt-1 text-xs text-emerald-800/90 dark:text-emerald-400/90">
-                Rolling window from the database clock — same telemetry as this list.
+                Rolling window from the database clock — same telemetry as this list. Counts below use last activity in
+                the window; click a funnel metric to apply the matching quick filter.
               </p>
               {recap ? (
-                <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3 sm:gap-3">
-                  <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
-                    <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      Last activity in window
-                    </dt>
-                    <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                      {fmt(recap.submissionsLastActive)}{' '}
-                      <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
-                    </dd>
+                <>
+                  <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3 sm:gap-3">
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Last activity in window
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmt(recap.submissionsLastActive)}{' '}
+                        <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        New journeys
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmt(recap.submissionsNew)}{' '}
+                        <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50 sm:col-span-1">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Events logged
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmt(recap.eventsLogged)}{' '}
+                        <span className="font-normal text-zinc-600 dark:text-zinc-400">rows</span>
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-emerald-900/90 dark:text-emerald-300/90">
+                    Funnel (click to filter)
+                  </p>
+                  <div className="mt-1.5 grid gap-2 sm:grid-cols-3 sm:gap-3">
+                    <Link
+                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.bookingSucceeded}`}
+                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
+                    >
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Booking succeeded
+                      </span>
+                      <span className="mt-0.5 block font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
+                        {fmt(recap.bookingSucceeded)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-emerald-700 underline-offset-2 group-hover:underline dark:text-emerald-500/90">
+                        Apply quick filter
+                      </span>
+                    </Link>
+                    <Link
+                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.eligibilityPassed}`}
+                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
+                    >
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Eligibility passed
+                      </span>
+                      <span className="mt-0.5 block font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
+                        {fmt(recap.eligibilityPassed)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-emerald-700 underline-offset-2 group-hover:underline dark:text-emerald-500/90">
+                        Apply quick filter
+                      </span>
+                    </Link>
+                    <Link
+                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.bookingFailed}`}
+                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
+                    >
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Booking failed
+                      </span>
+                      <span className="mt-0.5 block font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
+                        {fmt(recap.bookingFailed)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-emerald-700 underline-offset-2 group-hover:underline dark:text-emerald-500/90">
+                        Apply quick filter
+                      </span>
+                    </Link>
                   </div>
-                  <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
-                    <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      New journeys
-                    </dt>
-                    <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                      {fmt(recap.submissionsNew)}{' '}
-                      <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
-                    </dd>
-                  </div>
-                  <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50 sm:col-span-1">
-                    <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      Events logged
-                    </dt>
-                    <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                      {fmt(recap.eventsLogged)}{' '}
-                      <span className="font-normal text-zinc-600 dark:text-zinc-400">rows</span>
-                    </dd>
-                  </div>
-                </dl>
+                </>
               ) : (
                 <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
                   {dbError ? 'Connect the database to see recap stats.' : 'Recap unavailable.'}
