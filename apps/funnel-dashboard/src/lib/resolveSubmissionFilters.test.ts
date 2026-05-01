@@ -68,7 +68,7 @@ describe('resolveSubmissionListFilters', () => {
     expect(filters.event_type).toBe('user_action');
   });
 
-  it('applies et_page_view without overriding step when map has no step', () => {
+  it('ignores manual step/event when preset only sets event_type', () => {
     const { filters } = resolveSubmissionListFilters({
       billy_preset: 'et_page_view',
       step: 'Page: Choose appointment slot',
@@ -76,7 +76,21 @@ describe('resolveSubmissionListFilters', () => {
       event_type: 'user_action',
     });
     expect(filters.event_type).toBe('page_view');
-    expect(filters.step).toBe('Page: Choose appointment slot');
+    expect(filters.step).toBe('');
+  });
+
+  it('passes q and dates while preset clears conflicting manual step', () => {
+    const { filters } = resolveSubmissionListFilters({
+      billy_preset: 'et_booking_result',
+      q: '10285',
+      date_from: '2026-01-01',
+      step: 'Page: Booking confirmation / outcome',
+      event_type: 'page_view',
+    });
+    expect(filters.q).toBe('10285');
+    expect(filters.date_from).toBe('2026-01-01');
+    expect(filters.step).toBe('');
+    expect(filters.event_type).toBe('booking_result');
   });
 
   it('ignores unknown billy_preset', () => {

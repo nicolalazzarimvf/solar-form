@@ -31,6 +31,10 @@ export function parseDateParam(value: string | undefined): string | undefined {
 /**
  * Merges manual query params with optional `billy_preset` quick filter
  * (same rules as the submissions list page).
+ *
+ * When a valid preset is selected it alone defines `step` / `event_type` (each optional
+ * dimension defaults to empty = “any”). Manual dropdown values from the URL are ignored
+ * so leftover params cannot tighten the query into an impossible combination.
  */
 export function resolveSubmissionListFilters(sp: SubmissionSearchParams): {
   activePreset: string;
@@ -38,20 +42,26 @@ export function resolveSubmissionListFilters(sp: SubmissionSearchParams): {
 } {
   const activePreset = normalizeBillyPresetKey(sp.billy_preset);
 
-  let resolvedStep = mergeStepFilter(sp);
-  let resolvedEventType = (sp.event_type ?? '').trim();
   if (activePreset) {
     const slice = BILLY_QUICK_MAP[activePreset];
-    if (slice.step !== undefined) resolvedStep = slice.step;
-    if (slice.event_type !== undefined) resolvedEventType = slice.event_type;
+    return {
+      activePreset,
+      filters: {
+        q: sp.q,
+        step: slice.step !== undefined ? slice.step : '',
+        event_type: slice.event_type !== undefined ? slice.event_type : '',
+        date_from: sp.date_from,
+        date_to: sp.date_to,
+      },
+    };
   }
 
   return {
-    activePreset,
+    activePreset: '',
     filters: {
       q: sp.q,
-      step: resolvedStep,
-      event_type: resolvedEventType,
+      step: mergeStepFilter(sp),
+      event_type: (sp.event_type ?? '').trim(),
       date_from: sp.date_from,
       date_to: sp.date_to,
     },

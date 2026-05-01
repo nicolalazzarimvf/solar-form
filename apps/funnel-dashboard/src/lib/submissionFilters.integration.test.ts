@@ -99,10 +99,7 @@ describe.skipIf(!hasDbUrl)(
     });
 
     it('matches reference for et_page_view (event type only)', async () => {
-      const { filters } = resolveSubmissionListFilters({
-        billy_preset: 'et_page_view',
-        step: 'Page: Choose appointment slot',
-      });
+      const { filters } = resolveSubmissionListFilters({ billy_preset: 'et_page_view' });
       await assertCountsMatch(filters);
     });
 
