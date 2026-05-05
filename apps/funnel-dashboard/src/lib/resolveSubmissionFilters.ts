@@ -15,6 +15,8 @@ export type SubmissionSearchParams = {
   q?: string;
   date_from?: string;
   date_to?: string;
+  recap_date_from?: string;
+  recap_date_to?: string;
   billy_preset?: string;
 };
 
