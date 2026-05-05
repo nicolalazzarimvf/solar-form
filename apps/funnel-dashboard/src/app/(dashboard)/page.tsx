@@ -17,6 +17,8 @@ export default async function HomePage({
 }) {
   const sp = await searchParams;
   const { activePreset, filters } = resolveSubmissionListFilters(sp);
+  const recapDateFrom = typeof sp.recap_date_from === 'string' ? sp.recap_date_from : '';
+  const recapDateTo = typeof sp.recap_date_to === 'string' ? sp.recap_date_to : '';
   const hasActiveFilters =
     activePreset !== '' ||
     Boolean((filters.q ?? '').trim()) ||
@@ -30,7 +32,10 @@ export default async function HomePage({
     const pool = getPool();
     rows = await fetchSubmissionList(pool, filters);
     try {
-      recap = await fetchLast7DaysRecap(pool);
+      recap = await fetchLast7DaysRecap(pool, {
+        dateFrom: recapDateFrom,
+        dateTo: recapDateTo,
+      });
     } catch {
       recap = null;
     }
@@ -39,6 +44,10 @@ export default async function HomePage({
   }
 
   const fmt = (n: number) => new Intl.NumberFormat().format(n);
+  const fmtPct = (num: number, den: number) => {
+    if (den <= 0) return '0%';
+    return `${((num / den) * 100).toFixed(1)}%`;
+  };
 
   return (
     <div>
@@ -109,78 +118,111 @@ export default async function HomePage({
                 Last 7 days (recap)
               </h3>
               <p className="mt-1 text-xs text-emerald-800/90 dark:text-emerald-400/90">
-                Rolling window from the database clock — same telemetry as this list. Funnel counts use submissions with
-                last activity in the window; click a metric to apply the matching quick filter.
+                Default is a rolling 7-day window from the database clock. You can optionally set a custom recap date
+                range below.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-emerald-900/90 dark:text-emerald-300/90">
+                  Recap date from
+                  <input
+                    name="recap_date_from"
+                    type="date"
+                    defaultValue={recapDateFrom}
+                    className="rounded-md border border-emerald-200/70 bg-white px-2 py-1.5 text-xs font-normal text-zinc-900 dark:border-emerald-900/60 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-emerald-900/90 dark:text-emerald-300/90">
+                  Recap date to
+                  <input
+                    name="recap_date_to"
+                    type="date"
+                    defaultValue={recapDateTo}
+                    className="rounded-md border border-emerald-200/70 bg-white px-2 py-1.5 text-xs font-normal text-zinc-900 dark:border-emerald-900/60 dark:bg-zinc-950 dark:text-zinc-100"
+                  />
+                </label>
+              </div>
+              <p className="mt-1 text-[11px] text-emerald-800/90 dark:text-emerald-400/90">
+                Leave both empty to use the default last 7 days.
               </p>
               {recap ? (
                 <>
                   <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2 sm:gap-3">
                     <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
                       <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        New journeys
+                        Total users
                       </dt>
                       <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                        {fmt(recap.submissionsNew)}{' '}
-                        <span className="font-normal text-zinc-600 dark:text-zinc-400">submissions</span>
+                        {fmt(recap.totalUsers)}
                       </dd>
                     </div>
-                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                    <Link
+                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.sawSolarForm}`}
+                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
+                    >
                       <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Events logged
+                        Saw the solar form
                       </dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                        {fmt(recap.eventsLogged)}{' '}
-                        <span className="font-normal text-zinc-600 dark:text-zinc-400">rows</span>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
+                        {fmt(recap.sawSolarForm)}
                       </dd>
-                    </div>
-                  </dl>
-                  <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-emerald-900/90 dark:text-emerald-300/90">
-                    Funnel (click to filter)
-                  </p>
-                  <div className="mt-1.5 grid gap-2 sm:grid-cols-3 sm:gap-3">
+                    </Link>
+                    <Link
+                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.startedForm}`}
+                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
+                    >
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Started the form
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
+                        {fmt(recap.startedForm)}
+                      </dd>
+                    </Link>
                     <Link
                       href={`/?billy_preset=${RECAP_CLICK_PRESETS.bookingSucceeded}`}
                       className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
                     >
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Booking succeeded
-                      </span>
-                      <span className="mt-0.5 block font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
-                        {fmt(recap.bookingSucceeded)}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-emerald-700 underline-offset-2 group-hover:underline dark:text-emerald-500/90">
-                        Apply quick filter
-                      </span>
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Booked
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
+                        {fmt(recap.booked)}
+                      </dd>
                     </Link>
-                    <Link
-                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.eligibilityPassed}`}
-                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
-                    >
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Eligibility passed
-                      </span>
-                      <span className="mt-0.5 block font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
-                        {fmt(recap.eligibilityPassed)}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-emerald-700 underline-offset-2 group-hover:underline dark:text-emerald-500/90">
-                        Apply quick filter
-                      </span>
-                    </Link>
-                    <Link
-                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.bookingFailed}`}
-                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
-                    >
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        Booking failed
-                      </span>
-                      <span className="mt-0.5 block font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
-                        {fmt(recap.bookingFailed)}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-emerald-700 underline-offset-2 group-hover:underline dark:text-emerald-500/90">
-                        Apply quick filter
-                      </span>
-                    </Link>
-                  </div>
+                  </dl>
+                  <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2 sm:gap-3">
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Engagement rate (start/seen)
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmtPct(recap.startedForm, recap.sawSolarForm)}
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Booked rate (total)
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmtPct(recap.booked, recap.totalUsers)}
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Booked rate (seen)
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmtPct(recap.booked, recap.sawSolarForm)}
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Booked rate (started)
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmtPct(recap.booked, recap.startedForm)}
+                      </dd>
+                    </div>
+                  </dl>
                 </>
               ) : (
                 <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">

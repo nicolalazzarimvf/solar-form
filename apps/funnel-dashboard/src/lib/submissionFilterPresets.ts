@@ -100,6 +100,10 @@ export type BillyQuickSlice = Partial<{
 }>;
 
 export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
+  page_thank_you: {
+    step: 'Page: Thank you — book online or callback?',
+    event_type: 'page_view',
+  },
   thank_book_online: {
     step: 'Thank-you: Book online',
     event_type: 'user_action',

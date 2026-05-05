@@ -3,9 +3,9 @@ import { BILLY_QUICK_MAP } from './submissionFilterPresets';
 
 /** GET `billy_preset` values for recap links — keep aligned with `BILLY_QUICK_MAP`. */
 export const RECAP_CLICK_PRESETS = {
+  sawSolarForm: 'page_thank_you',
+  startedForm: 'thank_book_online',
   bookingSucceeded: 'booking_succeeded',
-  bookingFailed: 'booking_failed',
-  eligibilityPassed: 'eligibility_passed',
 } as const;
 
 function ilikeContains(value: string): string {
@@ -13,114 +13,89 @@ function ilikeContains(value: string): string {
 }
 
 export type Last7DaysRecap = {
-  /** Distinct submissions whose first event falls in the window (new journeys). */
-  submissionsNew: number;
-  /** Total `journey_events` rows in the window. */
-  eventsLogged: number;
-  /**
-   * Among submissions with last activity in the window: latest event matches the
-   * booking succeeded preset (same as quick filter).
-   */
-  bookingSucceeded: number;
-  /**
-   * Same universe; latest event matches booking failed preset.
-   */
-  bookingFailed: number;
-  /**
-   * Same universe; at least one event matches eligibility-passed preset (`any_event` semantics).
-   */
-  eligibilityPassed: number;
+  /** Distinct submissions with any telemetry in the rolling 7-day window. */
+  totalUsers: number;
+  /** Distinct submissions that saw the thank-you entry page in the same window. */
+  sawSolarForm: number;
+  /** Distinct submissions that clicked "Book online" in the same window. */
+  startedForm: number;
+  /** Distinct submissions that reached booking success in the same window. */
+  booked: number;
 };
 
-const SUMMARY_SQL = `
-  WITH agg AS (
-    SELECT submission_id, MIN(created_at) AS first_at
-    FROM journey_events
-    GROUP BY submission_id
-  )
-  SELECT
-    (SELECT COUNT(*)::bigint FROM agg WHERE first_at >= NOW() - INTERVAL '7 days') AS submissions_new,
-    (SELECT COUNT(*)::bigint FROM journey_events WHERE created_at >= NOW() - INTERVAL '7 days') AS events_logged
-`;
+export type RecapRangeInput = {
+  dateFrom?: string;
+  dateTo?: string;
+};
 
-const OUTCOMES_SQL = `
-  WITH recent AS (
-    SELECT s.submission_id,
-           s.last_at,
-           e.step AS last_step,
-           e.event_type AS last_event_type
-    FROM (
-      SELECT submission_id, MAX(created_at) AS last_at
-      FROM journey_events
-      GROUP BY submission_id
-    ) s
-    JOIN LATERAL (
-      SELECT step, event_type
-      FROM journey_events j
-      WHERE j.submission_id = s.submission_id
-      ORDER BY j.created_at DESC, j.id DESC
-      LIMIT 1
-    ) e ON true
-    WHERE s.last_at >= NOW() - INTERVAL '7 days'
+function normalizeISODate(value: string | undefined): string | null {
+  const v = (value ?? '').trim();
+  if (!v) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  return v;
+}
+
+function nextDayISO(dateISO: string): string {
+  const dt = new Date(`${dateISO}T00:00:00Z`);
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString();
+}
+
+const RECAP_SQL = `
+  WITH windowed AS (
+    SELECT submission_id, step, event_type
+    FROM journey_events
+    WHERE created_at >= COALESCE($7::timestamptz, NOW() - INTERVAL '7 days')
+      AND created_at < COALESCE($8::timestamptz, NOW() + INTERVAL '1 day')
   )
   SELECT
-    COUNT(*) FILTER (
-      WHERE last_step ILIKE $1 AND last_event_type ILIKE $2
-    )::bigint AS booking_succeeded,
-    COUNT(*) FILTER (
-      WHERE last_step ILIKE $3 AND last_event_type ILIKE $4
-    )::bigint AS booking_failed,
-    COUNT(*) FILTER (
-      WHERE EXISTS (
-        SELECT 1
-        FROM journey_events j
-        WHERE j.submission_id = recent.submission_id
-          AND j.step ILIKE $5
-          AND j.event_type ILIKE $6
-      )
-    )::bigint AS eligibility_passed
-  FROM recent
+    COUNT(DISTINCT submission_id)::bigint AS total_users,
+    COUNT(DISTINCT submission_id) FILTER (
+      WHERE step ILIKE $1 AND event_type ILIKE $2
+    )::bigint AS saw_solar_form,
+    COUNT(DISTINCT submission_id) FILTER (
+      WHERE step ILIKE $3 AND event_type ILIKE $4
+    )::bigint AS started_form,
+    COUNT(DISTINCT submission_id) FILTER (
+      WHERE step ILIKE $5 AND event_type ILIKE $6
+    )::bigint AS booked
+  FROM windowed
 `;
 
 /**
- * Rolling window: last activity / first activity / events since `NOW() - interval '7 days'`
- * (database session timezone). Outcome counts use the same last-activity window and match
- * `buildSubmissionListWhereClause` behaviour for the three presets.
+ * Rolling window on event timestamps since `NOW() - interval '7 days'`
+ * (database session timezone). Counts are distinct submissions per funnel milestone.
  */
-export async function fetchLast7DaysRecap(pool: Pool): Promise<Last7DaysRecap> {
+export async function fetchLast7DaysRecap(pool: Pool, range?: RecapRangeInput): Promise<Last7DaysRecap> {
+  const seen = BILLY_QUICK_MAP.page_thank_you;
+  const started = BILLY_QUICK_MAP.thank_book_online;
   const bs = BILLY_QUICK_MAP.booking_succeeded;
-  const bf = BILLY_QUICK_MAP.booking_failed;
-  const ep = BILLY_QUICK_MAP.eligibility_passed;
+  const dateFrom = normalizeISODate(range?.dateFrom);
+  const dateTo = normalizeISODate(range?.dateTo);
 
-  const outcomeParams = [
+  const recapParams = [
+    ilikeContains(seen.step!),
+    ilikeContains(seen.event_type!),
+    ilikeContains(started.step!),
+    ilikeContains(started.event_type!),
     ilikeContains(bs.step!),
     ilikeContains(bs.event_type!),
-    ilikeContains(bf.step!),
-    ilikeContains(bf.event_type!),
-    ilikeContains(ep.step!),
-    ilikeContains(ep.event_type!),
+    dateFrom ? `${dateFrom}T00:00:00Z` : null,
+    dateTo ? nextDayISO(dateTo) : null,
   ];
 
-  const [summaryRes, outcomesRes] = await Promise.all([
-    pool.query<{
-      submissions_new: string;
-      events_logged: string;
-    }>(SUMMARY_SQL),
-    pool.query<{
-      booking_succeeded: string;
-      booking_failed: string;
-      eligibility_passed: string;
-    }>(OUTCOMES_SQL, outcomeParams),
-  ]);
-
-  const s = summaryRes.rows[0];
-  const o = outcomesRes.rows[0];
+  const recapRes = await pool.query<{
+    total_users: string;
+    saw_solar_form: string;
+    started_form: string;
+    booked: string;
+  }>(RECAP_SQL, recapParams);
+  const r = recapRes.rows[0];
 
   return {
-    submissionsNew: Number(s?.submissions_new ?? 0),
-    eventsLogged: Number(s?.events_logged ?? 0),
-    bookingSucceeded: Number(o?.booking_succeeded ?? 0),
-    bookingFailed: Number(o?.booking_failed ?? 0),
-    eligibilityPassed: Number(o?.eligibility_passed ?? 0),
+    totalUsers: Number(r?.total_users ?? 0),
+    sawSolarForm: Number(r?.saw_solar_form ?? 0),
+    startedForm: Number(r?.started_form ?? 0),
+    booked: Number(r?.booked ?? 0),
   };
 }
