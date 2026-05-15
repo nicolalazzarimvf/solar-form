@@ -7,7 +7,8 @@ Deno.serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    let phone = req.headers.get('phone')?.trim() ?? '';
+    const url = new URL(req.url);
+    let phone = url.searchParams.get('phone')?.trim() ?? req.headers.get('phone')?.trim() ?? '';
     if (!phone && req.method === 'POST') {
       try {
         const body = (await req.json()) as { phone?: string };
@@ -24,22 +25,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const apiKey = Deno.env.get('PROJECT_SOLAR_MVF_API_KEY');
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'PROJECT_SOLAR_MVF_API_KEY not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const mvfUrl = `${MVF_API_URL}/check-customer-eligibility?phone=${encodeURIComponent(phone)}`;
+    const mvfHeaders: Record<string, string> = {};
+    if (anonKey) {
+      mvfHeaders.Authorization = `Bearer ${anonKey}`;
+    } else if (apiKey) {
+      mvfHeaders['x-api-key'] = apiKey;
+      mvfHeaders.phone = phone;
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'SUPABASE_ANON_KEY or PROJECT_SOLAR_MVF_API_KEY not configured' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
     }
 
-    const mvfUrl = `${MVF_API_URL}/check-customer-eligibility`;
     const proxyRes = await fetch(mvfUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        phone,
-      },
+      method: 'GET',
+      headers: mvfHeaders,
     });
 
     const data = await proxyRes.text();

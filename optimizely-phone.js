@@ -642,10 +642,16 @@
     });
   }
 
-  function getCustomerEligibilityUrl() {
-    if (CONFIG.customerEligibilityApiUrl) return CONFIG.customerEligibilityApiUrl;
-    var base = CONFIG.getAvailabilityApiUrl || 'https://sejpbjqjfxmehyvlweil.supabase.co/functions/v1';
-    return base.replace(/\/$/, '') + '/check-customer-eligibility-proxy';
+  function getCustomerEligibilityUrl(phoneE164) {
+    var base = CONFIG.customerEligibilityApiUrl;
+    if (!base) {
+      // MVF check-customer-eligibility has no CORS on browser preflight; use our Vercel proxy.
+      base =
+        CONFIG.customerEligibilityProxyUrl ||
+        'https://solar-form-eight.vercel.app/api/check-customer-eligibility';
+    }
+    var sep = base.indexOf('?') === -1 ? '?' : '&';
+    return base + sep + 'phone=' + encodeURIComponent(phoneE164 || '');
   }
 
   function failEligibleStayOnTyp(eventObj, step, errorDetail) {
@@ -670,7 +676,7 @@
         resolve({ ok: false, eligible: false, error: 'missing_phone' });
         return;
       }
-      var url = getCustomerEligibilityUrl();
+      var url = getCustomerEligibilityUrl(phoneE164);
       var timeoutMs = CONFIG.customerEligibilityTimeoutMs || 10000;
       var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var timeoutId = null;
@@ -688,15 +694,17 @@
         finish({ ok: false, eligible: false, error: 'timeout' });
       }, timeoutMs);
 
-      fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          phone: phoneE164,
-        },
-        body: JSON.stringify({ phone: phoneE164 }),
-        signal: controller ? controller.signal : undefined,
-      })
+      var fetchOptions = { method: 'GET' };
+      if (controller) fetchOptions.signal = controller.signal;
+      // Proxy adds MVF Bearer server-side; direct MVF URL still needs Authorization.
+      var isMvfDirect =
+        url.indexOf('sejpbjqjfxmehyvlweil.supabase.co') !== -1 ||
+        url.indexOf('wppwuqfrvtvtnfgwxnbd.supabase.co') !== -1;
+      if (isMvfDirect && CONFIG.getAvailabilityApiKey) {
+        fetchOptions.headers = { Authorization: 'Bearer ' + CONFIG.getAvailabilityApiKey };
+      }
+
+      fetch(url, fetchOptions)
         .then(function (res) {
           return res.text().then(function (text) {
             var data = {};
