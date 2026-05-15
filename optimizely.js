@@ -39,10 +39,10 @@
     slotCheckTimeoutMs: 15000,
     allowedOutwardCodesUrl:
       'https://solar-form-eight.vercel.app/allowed-outward-codes.json',
-    // Must stay in sync with VITE_PROJECT_SOLAR_MVF_API_URL: {base}/appointments
+    // Must stay in sync with VITE_PROJECT_SOLAR_MVF_API_KEY (rotated — do not revert to old key).
     // Staging: https://wppwuqfrvtvtnfgwxnbd.supabase.co/functions/v1/appointments (+ MVF x-api-key for that project).
     appointmentsApiUrl: 'https://sejpbjqjfxmehyvlweil.supabase.co/functions/v1/appointments',
-    appointmentsApiKey: '5FVpsEtJ77rQoH3hD8jxPZSI6kIZx5WYlvvw98mRCUfvTh9yFdLXiRdFRV8cTA1O',
+    appointmentsApiKey: 'CSMy8kuqz9fRqAHJRcZKoppMtE0IkKG0IrFSj7jJcqOBZpjjF5DXQumEE3Ddmpp6',
     requiredAnswers: {
       // Accept multiple variants because Chameleon configs can emit either label text
       // (e.g. "homeowner") or binary values (e.g. "yes"/"no").
