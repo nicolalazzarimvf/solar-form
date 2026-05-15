@@ -8,6 +8,8 @@
     "build": "node scripts/generate-allowed-postcodes.mjs && vite build",
     "preview": "vite preview",
     "build:allowed-postcodes": "node scripts/generate-allowed-postcodes.mjs",
+    "check-slots": "node scripts/check-postcode-slots.mjs",
+    "find-slots": "node scripts/find-postcodes-with-slots.mjs",
     "lint": "eslint src --ext js,jsx",
     "test": "vitest",
     "test:run": "vitest run",

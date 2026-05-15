@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
+import { FindSlotsCta } from '@/components/FindSlotsCta';
 import { fetchLast7DaysRecap, RECAP_CLICK_PRESETS } from '@/lib/last7DaysRecap';
 import { fetchSubmissionList } from '@/lib/submissionListQuery';
 import { BILLY_QUICK_GROUPS } from '@/lib/submissionFilterPresets';
@@ -51,6 +52,7 @@ export default async function HomePage({
 
   return (
     <div>
+      <FindSlotsCta />
       <h1 className="mb-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
         Submissions
       </h1>
