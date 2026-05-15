@@ -656,10 +656,11 @@
 
   function failEligibleStayOnTyp(eventObj, step, errorDetail) {
     window.__solarOptlySlotCheckInFlight = false;
-    postAppointmentUpdate('failed', step, errorDetail);
-    hideFullPageSubmitOverlay();
-    revealIframeAfterSwap(eventObj.iFrameId);
-    keepTypSolarMarketingHidden();
+    return postAppointmentUpdate('failed', step, errorDetail).finally(function () {
+      hideFullPageSubmitOverlay();
+      revealIframeAfterSwap(eventObj.iFrameId);
+      keepTypSolarMarketingHidden();
+    });
   }
 
   function extractPhoneFromAnswers(answers) {
@@ -745,7 +746,6 @@
       failEligibleStayOnTyp(eventObj, 'customer_eligibility_no_phone');
       return;
     }
-    postAppointmentUpdate('progressing', 'customer_eligibility_check');
     checkCustomerEligibility(phone)
       .then(function (result) {
         window.__solarOptlyCustomerEligibilityResult = result;
@@ -760,7 +760,9 @@
           return;
         }
         log('Customer eligibility OK', result.reason || '');
-        startEligibleSlotCheck(postcode, eventObj, qualifyContext);
+        return postAppointmentUpdate('progressing', 'customer_eligibility_check').then(function () {
+          startEligibleSlotCheck(postcode, eventObj, qualifyContext);
+        });
       });
   }
 
@@ -775,12 +777,12 @@
         error: 'Invalid postcode for area check',
         postcode: pcNorm,
       };
-      postAppointmentUpdate('failed', 'postcode_not_serviceable');
-      hideFullPageSubmitOverlay();
-      revealIframeAfterSwap(eventObj.iFrameId);
-      keepTypSolarMarketingHidden();
       log('Eligible but postcode too short for outward extract', postcode);
-      return;
+      return postAppointmentUpdate('failed', 'postcode_not_serviceable').finally(function () {
+        hideFullPageSubmitOverlay();
+        revealIframeAfterSwap(eventObj.iFrameId);
+        keepTypSolarMarketingHidden();
+      });
     }
     loadAllowedOutwardSet()
       .then(function (map) {
@@ -793,14 +795,14 @@
             postcode: pcNorm,
             outward: outward,
           };
-          postAppointmentUpdate('failed', 'postcode_not_serviceable');
-          hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
-          keepTypSolarMarketingHidden();
           log('Postcode outward not in allowlist', outward);
-          return 'denied';
+          return postAppointmentUpdate('failed', 'postcode_not_serviceable').then(function () {
+            hideFullPageSubmitOverlay();
+            revealIframeAfterSwap(eventObj.iFrameId);
+            keepTypSolarMarketingHidden();
+            return 'denied';
+          });
         }
-        postAppointmentUpdate('progressing', 'slot_check');
         return checkSlotsAvailable(postcode);
       })
       .then(function (result) {
@@ -808,25 +810,33 @@
         window.__solarOptlySlotCheckInFlight = false;
         var hasSlots = result === true;
         if (hasSlots) {
-          postAppointmentUpdate('progressing', 'qualified');
-          onQualifiedMatch(qualifyContext, eventObj);
-        } else {
-          postAppointmentUpdate('failed', 'no_slots');
-          hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
-          keepTypSolarMarketingHidden();
-          log('Eligible but no slots available; staying on TYP');
+          return postAppointmentUpdate('progressing', 'slot_check').then(function () {
+            return postAppointmentUpdate('progressing', 'qualified');
+          }).then(function () {
+            onQualifiedMatch(qualifyContext, eventObj);
+          });
         }
+        return postAppointmentUpdate('progressing', 'slot_check')
+          .then(function () {
+            return postAppointmentUpdate('failed', 'no_slots');
+          })
+          .then(function () {
+            hideFullPageSubmitOverlay();
+            revealIframeAfterSwap(eventObj.iFrameId);
+            keepTypSolarMarketingHidden();
+            log('Eligible but no slots available; staying on TYP');
+          });
       })
       .catch(function (err) {
         window.__solarOptlySlotCheckInFlight = false;
         var msg = String(err && err.message ? err.message : err);
         var step = /allowed list|invalid JSON/i.test(msg) ? 'postcode_allowlist_error' : 'slot_check_error';
-        postAppointmentUpdate('failed', step);
-        hideFullPageSubmitOverlay();
-        revealIframeAfterSwap(eventObj.iFrameId);
-        keepTypSolarMarketingHidden();
         log('Allowed list or slot check failed', err);
+        return postAppointmentUpdate('failed', step).finally(function () {
+          hideFullPageSubmitOverlay();
+          revealIframeAfterSwap(eventObj.iFrameId);
+          keepTypSolarMarketingHidden();
+        });
       });
   }
 
@@ -866,11 +876,24 @@
     };
   }
 
+  var __appointmentUpdateQueue = Promise.resolve();
+
   function postAppointmentUpdate(status, step, errorDetail) {
+    var run = function () {
+      return postAppointmentUpdateOnce(status, step, errorDetail);
+    };
+    var next = __appointmentUpdateQueue.then(run, run);
+    __appointmentUpdateQueue = next.catch(function () {
+      /* keep queue alive after a failed MVF call */
+    });
+    return next;
+  }
+
+  function postAppointmentUpdateOnce(status, step, errorDetail) {
     var submissionId = getSubmissionId();
     if (!submissionId) {
       log('postAppointmentUpdate skipped: no submissionId');
-      return;
+      return Promise.resolve();
     }
 
     var url = CONFIG.appointmentsApiUrl + '/' + encodeURIComponent(submissionId);
@@ -919,34 +942,36 @@
 
     var shouldGetAfter = status === 'successful';
 
-    fetch(url, {
+    return fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': CONFIG.appointmentsApiKey,
       },
       body: JSON.stringify(body),
-    }).then(function (res) {
-      entry.httpStatus = res.status;
-      if (!res.ok) {
-        entry.result = 'error';
-        entry.error = 'HTTP ' + res.status;
-        log('postAppointmentUpdate failed', entry.error);
-        return;
-      }
-      return res.json().then(function (data) {
-        entry.result = 'ok';
-        entry.response = data;
-        log('postAppointmentUpdate ok', data);
-        if (shouldGetAfter) {
-          getAppointmentStatus();
+    })
+      .then(function (res) {
+        entry.httpStatus = res.status;
+        if (!res.ok) {
+          entry.result = 'error';
+          entry.error = 'HTTP ' + res.status;
+          log('postAppointmentUpdate failed', entry.error);
+          return;
         }
+        return res.json().then(function (data) {
+          entry.result = 'ok';
+          entry.response = data;
+          log('postAppointmentUpdate ok', data);
+          if (shouldGetAfter) {
+            getAppointmentStatus();
+          }
+        });
+      })
+      .catch(function (err) {
+        entry.result = 'error';
+        entry.error = String(err);
+        log('postAppointmentUpdate error', err);
       });
-    }).catch(function (err) {
-      entry.result = 'error';
-      entry.error = String(err);
-      log('postAppointmentUpdate error', err);
-    });
   }
 
   function getAppointmentStatus() {
