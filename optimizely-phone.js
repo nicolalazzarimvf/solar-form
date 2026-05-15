@@ -180,6 +180,75 @@
       }).join('');
     }
 
+    var phoneHtml = '';
+    if (CONFIG.customerEligibilityEnabled === false) {
+      phoneHtml =
+        '<div style="margin:8px 0;padding:8px;background:#2d2d44;border-radius:6px;">' +
+        '<div style="font-weight:600;font-size:11px;margin-bottom:4px;">Phone check (30d)</div>' +
+        '<div style="font-size:10px;color:#888;">disabled (CONFIG.customerEligibilityEnabled)</div>' +
+        '</div>';
+    } else {
+      var phoneResult = window.__solarOptlyCustomerEligibilityResult;
+      var phoneInFlight = window.__solarOptlyPhoneCheckInFlight;
+      var phoneForUi = window.__solarOptlyPhoneCheckPhone || '';
+      var phoneCheckUrl = window.__solarOptlyPhoneCheckUrl || '';
+      if (phoneResult || phoneInFlight || phoneForUi) {
+        var phoneColor = '#888';
+        var phoneLabel = '—';
+        var phoneDetail = '';
+        if (phoneInFlight && !phoneResult) {
+          phoneLabel = '…';
+          phoneDetail = 'checking...';
+          phoneColor = '#f1c40f';
+        } else if (phoneResult) {
+          if (!phoneResult.ok) {
+            phoneLabel = 'ERR';
+            phoneColor = '#c0392b';
+            phoneDetail = phoneResult.error || 'request failed';
+          } else if (!phoneResult.eligible) {
+            phoneLabel = 'NO';
+            phoneColor = '#c0392b';
+            phoneDetail = phoneResult.reason || 'not eligible';
+            if (phoneResult.customerCreatedAt) {
+              phoneDetail += ' (' + phoneResult.customerCreatedAt + ')';
+            }
+          } else {
+            phoneLabel = 'OK';
+            phoneColor = '#27ae60';
+            phoneDetail = phoneResult.reason || 'eligible';
+          }
+        }
+        var phoneMetaHtml = '';
+        if (phoneForUi) {
+          phoneMetaHtml +=
+            '<div style="font-size:9px;color:#888;margin-top:6px;">phone <span style="color:#ccc;">' +
+            escapeHtml(phoneForUi) +
+            '</span></div>';
+        }
+        if (phoneCheckUrl) {
+          phoneMetaHtml +=
+            '<div style="font-size:9px;color:#9ecba7;margin-top:6px;">GET (eligibility)</div>' +
+            '<div style="font-size:9px;color:#ccc;word-break:break-all;line-height:1.35;">' +
+            escapeHtml(phoneCheckUrl) +
+            '</div>';
+        }
+        phoneHtml =
+          '<div style="margin:8px 0;padding:8px;background:#2d2d44;border-radius:6px;">' +
+          '<div style="font-weight:600;font-size:11px;margin-bottom:4px;">Phone check (30d)</div>' +
+          '<div style="display:flex;align-items:center;gap:6px;">' +
+          '<span style="background:' +
+          phoneColor +
+          ';color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">' +
+          escapeHtml(phoneLabel) +
+          '</span>' +
+          '<span style="font-size:10px;color:#aaa;">' +
+          escapeHtml(phoneDetail) +
+          '</span></div>' +
+          phoneMetaHtml +
+          '</div>';
+      }
+    }
+
     var slotHtml = '';
     var slotResult = window.__solarOptlySlotCheckResult;
     var slotPcForUi = '';
@@ -305,6 +374,7 @@
     var newContent =
       '<div style="margin-bottom:8px;font-weight:700;color:#9ecba7;">Solar Debug</div>' +
       answersRow +
+      phoneHtml +
       slotHtml +
       endpointsHtml +
       appointmentHtml +
@@ -678,6 +748,9 @@
         return;
       }
       var url = getCustomerEligibilityUrl(phoneE164);
+      window.__solarOptlyPhoneCheckInFlight = true;
+      window.__solarOptlyPhoneCheckPhone = phoneE164;
+      window.__solarOptlyPhoneCheckUrl = url;
       var timeoutMs = CONFIG.customerEligibilityTimeoutMs || 10000;
       var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var timeoutId = null;
@@ -686,6 +759,7 @@
       function finish(result) {
         if (settled) return;
         settled = true;
+        window.__solarOptlyPhoneCheckInFlight = false;
         if (timeoutId) window.clearTimeout(timeoutId);
         resolve(result);
       }
@@ -746,6 +820,7 @@
       failEligibleStayOnTyp(eventObj, 'customer_eligibility_no_phone');
       return;
     }
+    window.__solarOptlyCustomerEligibilityResult = null;
     checkCustomerEligibility(phone)
       .then(function (result) {
         window.__solarOptlyCustomerEligibilityResult = result;
