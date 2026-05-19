@@ -96,6 +96,24 @@ export function loadOutwardCodesFromDisk(): string[] {
   );
 }
 
+const IDEAL_POSTCODES_BASE = 'https://api.ideal-postcodes.co.uk/v1/postcodes';
+
+/** True when Ideal Postcodes recognises the full postcode (same check as the solar-form address step). */
+export async function idealPostcodeExists(
+  postcode: string,
+  apiKey: string
+): Promise<boolean> {
+  if (!apiKey.trim()) return false;
+  const url = `${IDEAL_POSTCODES_BASE}/${encodeURIComponent(postcode)}?api_key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+  if (!res.ok) return false;
+  const data = (await res.json().catch(() => null)) as {
+    code?: number;
+    result?: unknown[];
+  } | null;
+  return data?.code === 2000 && Array.isArray(data.result) && data.result.length > 0;
+}
+
 async function fetchAvailability(
   base: string,
   postcode: string,
@@ -119,6 +137,8 @@ async function fetchAvailability(
 export type FindSlotsParams = {
   baseUrl: string;
   apiKey: string;
+  /** Ideal Postcodes API key — rejects synthetic outward+inward combos that are not real UK postcodes. */
+  idealPostcodesApiKey: string;
   outwards: string[];
   targetN: number;
   maxRequests: number;
@@ -131,6 +151,7 @@ export type FindSlotsParams = {
 export async function findPostcodesWithSlots({
   baseUrl,
   apiKey,
+  idealPostcodesApiKey,
   outwards,
   targetN,
   maxRequests,
@@ -153,15 +174,19 @@ export async function findPostcodesWithSlots({
 
       if (httpStatus !== 200) continue;
       const slots = countSlots(body as AvailabilityBody);
-      if (slots > 0) {
-        const area = outwardAreaKey(outward);
-        if (distinctAreasOnly && usedAreas.has(area)) continue;
-        if (distinctAreasOnly) usedAreas.add(area);
-        const availability =
-          (body as AvailabilityBody).availability ?? (body as AvailabilityBody).slots ?? [];
-        hits.push({ postcode, slots, days: availability.length });
-        if (hits.length >= targetN) break outer;
-      }
+      if (slots <= 0) continue;
+
+      const exists = await idealPostcodeExists(postcode, idealPostcodesApiKey);
+      if (sleepMs > 0) await new Promise((r) => setTimeout(r, sleepMs));
+      if (!exists) continue;
+
+      const area = outwardAreaKey(outward);
+      if (distinctAreasOnly && usedAreas.has(area)) continue;
+      if (distinctAreasOnly) usedAreas.add(area);
+      const availability =
+        (body as AvailabilityBody).availability ?? (body as AvailabilityBody).slots ?? [];
+      hits.push({ postcode, slots, days: availability.length });
+      if (hits.length >= targetN) break outer;
     }
   }
 

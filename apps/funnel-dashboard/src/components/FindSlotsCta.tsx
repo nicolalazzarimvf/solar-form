@@ -96,6 +96,9 @@ export function FindSlotsCta() {
       <h2 className="text-sm font-semibold text-sky-950 dark:text-sky-100">
         Find available slots for testing
       </h2>
+      <p className="mt-1 text-xs text-sky-900/70 dark:text-sky-400/90">
+        Postcodes must have appointment slots and exist in Ideal Postcodes (same as the funnel address step).
+      </p>
       <button
         type="button"
         onClick={() => void run()}

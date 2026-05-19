@@ -12,6 +12,17 @@ export async function POST(req: Request) {
 
   const baseUrl = (process.env.MVF_FUNCTIONS_BASE || DEFAULT_BASE).trim();
   const apiKey = (process.env.MVF_API_KEY || '').trim();
+  const idealPostcodesApiKey = (process.env.IDEAL_POSTCODES_API_KEY || '').trim();
+
+  if (!idealPostcodesApiKey) {
+    return NextResponse.json(
+      {
+        error:
+          'IDEAL_POSTCODES_API_KEY is not configured. Required so find-slots only returns real UK postcodes.',
+      },
+      { status: 500 }
+    );
+  }
 
   let body: { n?: number; maxRequests?: number; distinctAreasOnly?: boolean };
   try {
@@ -40,6 +51,7 @@ export async function POST(req: Request) {
     const { hits, requests } = await findPostcodesWithSlots({
       baseUrl,
       apiKey,
+      idealPostcodesApiKey,
       outwards,
       targetN,
       maxRequests,
