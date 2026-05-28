@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
-import { config } from '../config/env';
-import { queueFunnelEvent, redactTelemetryObject, STEPS, supabaseEdgeMeta } from '../telemetry';
-import {
-  formatBookAppointmentApiError,
-  isUkMobileE164,
-  normalizeUkPhoneE164,
-} from '../utils/projectSolarBooking';
+import { queueFunnelEvent, STEPS } from '../telemetry';
+import { isUkMobileE164, normalizeUkPhoneE164 } from '../utils/projectSolarBooking';
 import styles from './ConfirmationPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -26,25 +21,29 @@ export default function ConfirmationPage() {
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [bookingReference, setBookingReference] = useState('');
 
-  const pendingSuccessRef = useRef(null);
-
   const isDisqualified = bookingData.journeyStatus?.startsWith('disqualified') || false;
   const isSessionExpired = inactivityExpired || bookingData.journeyStatus === 'session_expired';
   const isCallbackRequired = bookingData.journeyStatus === 'callback_required';
 
-  useEffect(() => {
-    if (bookingConfirmed && pendingSuccessRef.current != null && window.parent !== window) {
-      window.parent.postMessage({
-        type: 'solar-optly-booking-result',
-        success: true,
-        bookingReference: pendingSuccessRef.current,
-        bookingSlot: bookingData.selectedSlot?.startTime || '',
-      }, '*');
-      pendingSuccessRef.current = null;
-    }
-  }, [bookingConfirmed]);
+  const notifyParentBookingResult = useCallback(({ success, bookingReference, bookingSlot, error }) => {
+    if (window.parent === window) return;
+    window.parent.postMessage({
+      type: 'solar-optly-booking-result',
+      success,
+      ...(bookingReference ? { bookingReference } : {}),
+      ...(bookingSlot ? { bookingSlot } : {}),
+      ...(error ? { error } : {}),
+    }, '*');
+  }, []);
 
   useEffect(() => {
+    if (bookingData.journeyStatus === 'booking_confirmed') {
+      setBookingReference(bookingData.bookingReference || '');
+      setBookingConfirmed(true);
+      setLoading(false);
+      return;
+    }
+
     if (bookingData.selectedSlot && !isDisqualified && !isSessionExpired && !isCallbackRequired) {
       submitBooking();
     } else {
@@ -84,7 +83,11 @@ export default function ConfirmationPage() {
         return;
       }
 
-      // Book appointment via Project Solar API (POST book-appointment).
+      const bookingSlot = bookingData.selectedSlot?.startTime || '';
+      if (!bookingSlot) {
+        throw new Error('No appointment slot selected');
+      }
+
       // Upstream validates customer.mobile as a UK mobile — landlines return 422 validation.phone.
       const mobile = normalizeUkPhoneE164(bookingData.phoneNumber);
       if (!mobile) {
@@ -98,141 +101,64 @@ export default function ConfirmationPage() {
         );
       }
 
-      const bookAppointmentPayload = {
-        firstname: (bookingData.firstName || '').trim(),
-        lastname: (bookingData.lastName || '').trim(),
-        postcode: (bookingData.postcode || '').trim().replace(/\s/g, '').toUpperCase(),
-        email: (bookingData.emailAddress || '').trim(),
-        booking_date: bookingData.selectedSlot?.startTime || '',
-        addressLine: (bookingData.fullAddress || '').trim(),
-        mobile,
-        provider_lead_id: String(bookingData.submissionId || bookingData.sessionId || ''),
-      };
-
-      const bookHeaders = {
-        'Content-Type': 'application/json',
-        ...(config.projectSolarMvfApiKey && { 'x-api-key': config.projectSolarMvfApiKey }),
-      };
-
-      console.log('[DEBUG] Booking appointment:', bookAppointmentPayload);
-
-      const bookEdgeFn = 'book-appointment';
-      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-      const bookingResponse = await fetch(`${config.projectSolarMvfApiUrl}/${bookEdgeFn}`, {
-        method: 'POST',
-        headers: bookHeaders,
-        body: JSON.stringify(bookAppointmentPayload),
-      });
-      const duration_ms = typeof performance !== 'undefined' ? Math.round(performance.now() - t0) : null;
-
-      if (!bookingResponse.ok) {
-        const errorData = await bookingResponse.json().catch(() => ({}));
-        console.error('[ERROR] Appointment booking failed:', errorData);
-        const apiSummary = formatBookAppointmentApiError(errorData);
-        queueFunnelEvent({
-          event_type: 'api_call',
-          step: STEPS.BOOK_API,
-          response_summary: `Supabase ${bookEdgeFn} rejected — HTTP ${bookingResponse.status}, ${duration_ms ?? '?'}ms`,
-          payload: redactTelemetryObject({
-            ...supabaseEdgeMeta(bookEdgeFn),
-            api: 'book_appointment',
-            route: '/confirmation',
-            request: {
-              postcode: bookAppointmentPayload.postcode,
-              booking_date: bookAppointmentPayload.booking_date,
-            },
-            response: {
-              http_status: bookingResponse.status,
-              api_message: errorData.message,
-              upstream_status: errorData.upstream_status,
-              summary: apiSummary.slice(0, 2000),
-            },
-            duration_ms,
-          }),
-        });
-        throw new Error(apiSummary);
+      if (window.parent === window) {
+        throw new Error('Booking must run inside the Chameleon iframe.');
       }
 
-      const bookingResult = await bookingResponse.json();
-      console.log('[DEBUG] Appointment booking success:', bookingResult);
+      // Parent Optimizely POSTs /appointments/{submissionId} with booking_slot,
+      // which triggers Project Solar booking server-side. Do not call book-appointment here.
+      const generatedRef = String(
+        bookingData.submissionId || bookingData.sessionId || generateMockReference()
+      );
 
-      queueFunnelEvent({
-        event_type: 'api_call',
-        step: STEPS.BOOK_API,
-        response_summary: `Supabase ${bookEdgeFn} accepted — ${duration_ms ?? '?'}ms`,
-        payload: redactTelemetryObject({
-          ...supabaseEdgeMeta(bookEdgeFn),
-          api: 'book_appointment',
-          route: '/confirmation',
-          request: {
-            postcode: bookAppointmentPayload.postcode,
-            booking_date: bookAppointmentPayload.booking_date,
-          },
-          response: {
-            booking_reference:
-              bookingResult.booking_reference || bookingResult.bookingReference || bookingResult.id,
-          },
-          duration_ms,
-        }),
+      console.log('[DEBUG] Requesting booking via parent POST /appointments', {
+        bookingSlot,
+        bookingReference: generatedRef,
       });
 
-      let generatedRef = bookingResult.booking_reference || bookingResult.bookingReference || bookingResult.id || '';
-      if (!generatedRef) {
-        const year = new Date().getFullYear();
-        const random = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
-        generatedRef = `PS-${year}-${random}`;
-      }
+      notifyParentBookingResult({
+        success: true,
+        bookingReference: generatedRef,
+        bookingSlot,
+      });
 
-      // Show booking confirmation (Project Solar booking succeeded)
       setBookingReference(generatedRef);
       setBookingConfirmed(true);
       confirmBooking(generatedRef);
-      pendingSuccessRef.current = generatedRef;
 
       queueFunnelEvent({
         event_type: 'booking_result',
         step: STEPS.BOOKING_CONFIRMED,
-        response_summary: `Booking confirmed — ref ${generatedRef}`,
-        payload: { route: '/confirmation', bookingReference: generatedRef },
+        response_summary: `Booking delegated to parent POST /appointments — ref ${generatedRef}`,
+        payload: { route: '/confirmation', bookingReference: generatedRef, bookingSlot },
       });
     } catch (err) {
       console.error('Booking submission failed:', err);
       const errMsg = String(err?.message || '');
-      const isSlotUnavailable = /time slot not available|410|slot.*unavailable/i.test(errMsg);
-      const isPhoneValidation = /validation\.phone|customer\.mobile/i.test(errMsg);
+      const isPhoneValidation = /validation\.phone|customer\.mobile|UK mobile|landline|07…/i.test(errMsg);
 
-      if (window.parent !== window) {
-        window.parent.postMessage({
-          type: 'solar-optly-booking-result',
-          success: false,
-          error: errMsg,
-        }, '*');
-      }
+      notifyParentBookingResult({
+        success: false,
+        error: errMsg,
+      });
 
       queueFunnelEvent({
         event_type: 'booking_result',
         step: STEPS.BOOKING_FAILED,
-        response_summary: isSlotUnavailable
-          ? 'Booking failed — slot no longer available'
-          : isPhoneValidation
-            ? 'Booking failed — phone/mobile validation'
-            : 'Booking failed — see error payload',
+        response_summary: isPhoneValidation
+          ? 'Booking failed — phone/mobile validation'
+          : 'Booking failed — see error payload',
         payload: {
           route: '/confirmation',
           error: errMsg.slice(0, 2000),
-          slotUnavailable: isSlotUnavailable,
           phoneValidation: isPhoneValidation,
         },
       });
 
-      if (isSlotUnavailable) {
-        updateBookingData({ lastError: 'slot_unavailable' });
-      } else {
-        updateBookingData({
-          journeyStatus: 'callback_required',
-          ...(isPhoneValidation && { lastError: 'phone_validation' }),
-        });
-      }
+      updateBookingData({
+        journeyStatus: 'callback_required',
+        ...(isPhoneValidation && { lastError: 'phone_validation' }),
+      });
     } finally {
       setLoading(false);
     }
