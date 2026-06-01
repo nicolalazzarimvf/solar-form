@@ -6,6 +6,18 @@ const BookingContext = createContext(null);
 
 const STORAGE_KEY = 'solar_booking_data';
 
+// Terminal journey statuses that must pin the user to /confirmation. Once a user
+// is disqualified, times out, or has booked, the browser back button must not let
+// them re-enter the funnel and change answers to re-qualify (or double-book).
+export const LOCKED_JOURNEY_STATUSES = [
+  'disqualified_eligibility',
+  'disqualified_solar',
+  'session_expired',
+  'booking_confirmed',
+];
+
+export const isLockedStatus = (status) => LOCKED_JOURNEY_STATUSES.includes(status);
+
 const DEFAULT_STATE = {
   // User data from Chameleon form
   firstName: '',

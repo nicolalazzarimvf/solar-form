@@ -141,7 +141,7 @@ export default function EligibilityQuestionsPage() {
         lastAction: 'eligibility_disqualified',
         lastActionPage: '/eligibility-questions',
       });
-      navigate({ pathname: '/confirmation', search: location.search });
+      navigate({ pathname: '/confirmation', search: location.search }, { replace: true });
       return;
     }
 

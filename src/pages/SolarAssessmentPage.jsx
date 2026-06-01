@@ -555,7 +555,7 @@ export default function SolarAssessmentPage() {
         response_summary: 'Roof/panel rules not met — sent to confirmation (callback)',
         payload: { route: '/solar-assessment', qualified: false },
       });
-      navigate('/confirmation');
+      navigate('/confirmation', { replace: true });
       return;
     }
 

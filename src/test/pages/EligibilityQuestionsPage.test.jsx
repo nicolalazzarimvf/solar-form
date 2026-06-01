@@ -81,7 +81,7 @@ describe('EligibilityQuestionsPage', () => {
     expect(continueButton).not.toBeDisabled();
     await user.click(continueButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/slot-selection');
+    expect(mockNavigate).toHaveBeenCalledWith({ pathname: '/slot-selection', search: '' });
   });
 
   it('navigates to confirmation with disqualified status when over 75', async () => {
@@ -103,6 +103,9 @@ describe('EligibilityQuestionsPage', () => {
     // Click continue
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
-    expect(mockNavigate).toHaveBeenCalledWith('/confirmation');
+    expect(mockNavigate).toHaveBeenCalledWith(
+      { pathname: '/confirmation', search: '' },
+      { replace: true }
+    );
   });
 });
