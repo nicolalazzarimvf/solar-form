@@ -9,7 +9,13 @@ export default function IndexPage() {
   const location = useLocation();
   const { bookingData, initializeSession, setUserData, updateBookingData } = useBooking();
   const { startTracking } = useInactivity();
-  const [showCallbackConfirmation, setShowCallbackConfirmation] = useState(false);
+  // Restore the callback confirmation on re-mount (e.g. browser back) — once the
+  // user has declined online booking, journeyStatus is persisted as
+  // 'callback_required', so we must keep showing the callback message instead of
+  // re-asking the question.
+  const [showCallbackConfirmation, setShowCallbackConfirmation] = useState(
+    () => bookingData.journeyStatus === 'callback_required'
+  );
 
   const notifyDecisionMade = (choice) => {
     if (window.parent !== window) {
