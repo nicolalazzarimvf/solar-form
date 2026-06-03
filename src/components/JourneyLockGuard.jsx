@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, isLockedStatus } from '../contexts';
 
 const CONFIRMATION_PATH = '/confirmation';
+const CALLBACK_STATUS = 'callback_required';
 
 /**
  * JourneyLockGuard: Once the user reaches a terminal journey status
@@ -18,16 +19,29 @@ export function JourneyLockGuard() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const locked = isLockedStatus(bookingData.journeyStatus);
+  const status = bookingData.journeyStatus;
 
-  // Redirect any non-confirmation route back to /confirmation while locked.
+  // Hard lock: force the user onto /confirmation from anywhere in the funnel.
+  const hardLocked = isLockedStatus(status);
+
+  // Pin the Back button on /confirmation for hard-locked states AND for
+  // callback_required (e.g. "roof changed since imagery", "no solar data"
+  // callbacks). We deliberately do NOT redirect callback_required from other
+  // routes: the IndexPage "No thank you" flow shows its callback message inline
+  // on '/'. But once a callback user has been sent to /confirmation, Back must
+  // not take them back into the funnel to change their answer.
+  const pinnedOnConfirmation =
+    (hardLocked || status === CALLBACK_STATUS) &&
+    location.pathname === CONFIRMATION_PATH;
+
+  // Redirect any non-confirmation route back to /confirmation while hard-locked.
   useEffect(() => {
-    if (locked && location.pathname !== CONFIRMATION_PATH) {
+    if (hardLocked && location.pathname !== CONFIRMATION_PATH) {
       navigate(CONFIRMATION_PATH, { replace: true });
     }
-  }, [locked, location.pathname, navigate]);
+  }, [hardLocked, location.pathname, navigate]);
 
-  // Trap the browser Back button while locked on /confirmation.
+  // Trap the browser Back button while pinned on /confirmation.
   //
   // A bare replace() only re-asserts the route until the iframe's pre-existing
   // history entries (/, /address, /solar-assessment, ...) are exhausted — after
@@ -38,7 +52,7 @@ export function JourneyLockGuard() {
   // the parent. Each Back lands on /confirmation, we push another sentinel, and
   // the user is trapped on the page no matter how many times they press Back.
   useEffect(() => {
-    if (!locked || location.pathname !== CONFIRMATION_PATH) return undefined;
+    if (!pinnedOnConfirmation) return undefined;
 
     // Preserve React Router's history state so its location stays consistent
     // (the URL never changes — every entry points at /confirmation).
@@ -57,7 +71,7 @@ export function JourneyLockGuard() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [locked, location.pathname, navigate]);
+  }, [pinnedOnConfirmation]);
 
   return null;
 }

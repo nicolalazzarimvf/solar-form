@@ -645,7 +645,7 @@ export default function SolarAssessmentPage() {
       response_summary: 'User said roof changed since satellite imagery — journey ended',
       payload: { route: '/solar-assessment', imageryWarning: 'yes' },
     });
-    navigate('/confirmation');
+    navigate('/confirmation', { replace: true });
   };
 
   const handleImageryWarningNo = () => {
@@ -723,7 +723,7 @@ export default function SolarAssessmentPage() {
                 lastAction: 'solar_unavailable_callback',
                 lastActionPage: '/solar-assessment',
               });
-              navigate('/confirmation');
+              navigate('/confirmation', { replace: true });
             }}
           >
             Request callback
