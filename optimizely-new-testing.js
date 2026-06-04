@@ -1864,6 +1864,22 @@
   // Runs at most one availability check per session (guarded by Done/Checking).
   function maybeShowPostcodeSlotTooltip(eventObj) {
     if (!CONFIG.postcodeTooltipEnabled) return;
+
+    // Debug: on every pageChanged, dump what we can see so we can confirm
+    // whether (and when) the cleartext postcode is available mid-form.
+    if (CONFIG.debug) {
+      var dbgAnswers = getAnswersFromDataLayer();
+      log('Postcode tooltip debug', {
+        lastAnsweredQuestion: eventObj && eventObj.lastAnsweredQuestion,
+        lastAnsweredAnswer: eventObj && eventObj.lastAnsweredAnswer,
+        answerKeys: dbgAnswers ? Object.keys(dbgAnswers) : null,
+        postcodeFromAnswers: extractPostcodeFromAnswers(dbgAnswers),
+        resolvedPostcode: resolveEnteredPostcode(eventObj),
+        done: !!window.__solarOptlyPostcodeTooltipDone,
+        checking: !!window.__solarOptlyPostcodeTooltipChecking,
+      });
+    }
+
     if (window.__solarOptlyPostcodeTooltipDone || window.__solarOptlyPostcodeTooltipChecking) {
       return;
     }
