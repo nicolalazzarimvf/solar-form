@@ -74,17 +74,19 @@
     },
     projectSolarLogoUrl:
       'https://images-ulpn.ecs.prd9.eu-west-1.mvfglobal.net/wp-content/uploads/2025/10/Project-Solar-long-full-colour-without-tag.svg',
-    // --- Postcode slot-availability tooltip (engagement experiment) ---
-    // After the user enters a postcode in Chameleon, show a tooltip over the
-    // widget ONLY when that postcode is (a) within the serviceable outward-code
-    // allowlist and (b) has bookable slots. Goal: lift drop-off into the
-    // appointment-booking stage.
-    // TODO(copy): placeholder phrasing — confirm final wording with Luke Brown.
+    // --- Post-postcode encouragement tooltip (engagement experiment) ---
+    // Shown over the Chameleon widget right after the user answers the
+    // "Postcode:" question, to lift drop-off into the appointment-booking stage.
+    // NOTE: This is NOT gated on live slot availability. Chameleon masks the
+    // postcode mid-form (lastAnsweredAnswer === '********') and does not expose
+    // the answers object until submission, so the cleartext postcode is not
+    // available in time to run a per-area slot check here.
+    // TODO(copy): confirm final wording with Luke Brown.
     postcodeTooltipEnabled: true,
     postcodeTooltipAutoHideMs: 0, // 0 = persist until dismissed / form advances
-    postcodeTooltipTitle: 'Good news — appointments are available in your area',
+    postcodeTooltipTitle: "We've teamed up with Project Solar",
     postcodeTooltipBody:
-      'Answer a few quick questions and you can book your solar appointment online with Project Solar.',
+      'Complete a few more quick questions to see if you qualify to book your solar appointment directly online.',
   };
 
   // Override from window.__solarOptlyConfig (set before script loads)
@@ -1839,84 +1841,22 @@
 
   // A value that looks like a real (unmasked) UK postcode: has a letter and a
   // digit, and no masking asterisks. Rejects redacted values like "********".
-  function looksLikeUkPostcodeValue(value) {
-    var s = String(value == null ? '' : value).trim();
-    if (!s || s.indexOf('*') !== -1) return false;
-    return /[a-z]/i.test(s) && /\d/.test(s);
-  }
-
-  // Resolve the entered postcode for the tooltip. Preferred signal is
-  // Chameleon's lastAnsweredQuestion/lastAnsweredAnswer on the pageChanged event
-  // (fires right after the user answers the "Postcode:" question). Falls back to
-  // scanning the collected dataLayer answers.
-  function resolveEnteredPostcode(eventObj) {
-    var lastQ = normalize((eventObj && eventObj.lastAnsweredQuestion) || '');
-    if (lastQ.indexOf('postcode') !== -1 || lastQ.indexOf('post code') !== -1) {
-      var lastA = (eventObj && eventObj.lastAnsweredAnswer) || '';
-      if (looksLikeUkPostcodeValue(lastA)) return String(lastA).trim();
-    }
-    var fromAnswers = extractPostcodeFromAnswers(getAnswersFromDataLayer());
-    return looksLikeUkPostcodeValue(fromAnswers) ? String(fromAnswers).trim() : '';
-  }
-
-  // Called on each pageChanged. Once the postcode is known, gate on the
-  // service-area allowlist + live slot availability, then show the tooltip.
-  // Runs at most one availability check per session (guarded by Done/Checking).
-  function maybeShowPostcodeSlotTooltip(eventObj) {
+  // Called on each pageChanged. Shows the encouragement tooltip once, right
+  // after the user answers the "Postcode:" question. Not gated on live slot
+  // availability — the cleartext postcode isn't exposed mid-form (Chameleon
+  // masks lastAnsweredAnswer and only populates answers at submission).
+  function maybeShowPostcodeTooltip(eventObj) {
     if (!CONFIG.postcodeTooltipEnabled) return;
+    if (window.__solarOptlyPostcodeTooltipDone) return;
 
-    // Debug: on every pageChanged, dump what we can see so we can confirm
-    // whether (and when) the cleartext postcode is available mid-form.
-    if (CONFIG.debug) {
-      var dbgAnswers = getAnswersFromDataLayer();
-      log('Postcode tooltip debug', {
-        lastAnsweredQuestion: eventObj && eventObj.lastAnsweredQuestion,
-        lastAnsweredAnswer: eventObj && eventObj.lastAnsweredAnswer,
-        answerKeys: dbgAnswers ? Object.keys(dbgAnswers) : null,
-        postcodeFromAnswers: extractPostcodeFromAnswers(dbgAnswers),
-        resolvedPostcode: resolveEnteredPostcode(eventObj),
-        done: !!window.__solarOptlyPostcodeTooltipDone,
-        checking: !!window.__solarOptlyPostcodeTooltipChecking,
-      });
-    }
+    var lastQ = normalize((eventObj && eventObj.lastAnsweredQuestion) || '');
+    var justAnsweredPostcode =
+      lastQ.indexOf('postcode') !== -1 || lastQ.indexOf('post code') !== -1;
+    if (!justAnsweredPostcode) return;
 
-    if (window.__solarOptlyPostcodeTooltipDone || window.__solarOptlyPostcodeTooltipChecking) {
-      return;
-    }
-
-    var postcode = resolveEnteredPostcode(eventObj);
-    if (!postcode) return; // postcode not captured yet — retry on a later pageChanged
-
-    var pcNorm = String(postcode).replace(/\s/g, '').toUpperCase();
-    var outward = extractUkOutwardCode(pcNorm);
-    if (!outward) return; // value not yet a usable postcode — retry on a later pageChanged
-
-    window.__solarOptlyPostcodeTooltipChecking = true;
-    var iFrameId = eventObj && eventObj.iFrameId;
-
-    loadAllowedOutwardSet()
-      .then(function (map) {
-        if (!map || !map[outward]) {
-          log('Postcode tooltip: outward not serviceable, skipping', outward);
-          return false;
-        }
-        return checkSlotsAvailable(postcode);
-      })
-      .then(function (hasSlots) {
-        window.__solarOptlyPostcodeTooltipChecking = false;
-        window.__solarOptlyPostcodeTooltipDone = true;
-        if (hasSlots === true) {
-          log('Postcode tooltip: slots available — showing', postcode);
-          showPostcodeTooltip(iFrameId);
-        } else {
-          log('Postcode tooltip: no slots / not serviceable — not showing', postcode);
-        }
-      })
-      .catch(function (err) {
-        window.__solarOptlyPostcodeTooltipChecking = false;
-        window.__solarOptlyPostcodeTooltipDone = true;
-        log('Postcode tooltip availability check failed', err);
-      });
+    window.__solarOptlyPostcodeTooltipDone = true;
+    log('Postcode tooltip: postcode step answered — showing tooltip');
+    showPostcodeTooltip(eventObj && eventObj.iFrameId);
   }
 
   function processDataLayerEvent(eventObj) {
@@ -1958,7 +1898,7 @@
       if (question === 'phone number' && eventObj.iFrameId) {
         ensureSubmitOverlay(eventObj.iFrameId);
       }
-      maybeShowPostcodeSlotTooltip(eventObj);
+      maybeShowPostcodeTooltip(eventObj);
     }
 
     if (
