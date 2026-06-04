@@ -40,7 +40,7 @@
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/loader',
     typPathContains: '/typ/project-solar/appointment/sp-uk/',
     typPathContainsAppointmentBooking: '/appointment-booking-form/sp-uk',
-    debug: false,
+    debug: true,
     maxWaitMs: 30000,
     pollMs: 250,
     eligibilityStorageKey: 'solar_optly_eligible_submission',
