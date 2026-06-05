@@ -1781,23 +1781,42 @@
 
     var tip = document.createElement('div');
     tip.setAttribute('data-solar-optly-postcode-tooltip', '1');
+    tip.setAttribute('role', 'status');
     tip.style.cssText =
-      'position:absolute;top:12px;left:50%;transform:translateX(-50%);' +
-      'max-width:92%;box-sizing:border-box;z-index:10001;' +
-      'background:#03624C;color:#ffffff;padding:12px 38px 12px 16px;border-radius:10px;' +
-      'box-shadow:0 6px 24px rgba(0,0,0,0.18);' +
-      "font:14px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;" +
-      'opacity:0;transition:opacity .25s ease;pointer-events:auto;';
+      'position:absolute;top:14px;left:50%;transform:translateX(-50%) translateY(-10px);' +
+      'width:min(380px,92%);box-sizing:border-box;z-index:10001;' +
+      'background:#ffffff;color:#1f2937;padding:16px 18px 16px 18px;border-radius:16px;' +
+      'box-shadow:0 14px 38px rgba(3,98,76,0.20);border:1px solid rgba(3,98,76,0.12);' +
+      'border-top:4px solid #03624C;' +
+      "font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
+      'opacity:0;transition:opacity .28s ease, transform .28s ease;pointer-events:auto;';
+
+    // Logo row
+    if (CONFIG.projectSolarLogoUrl) {
+      var logoWrap = document.createElement('div');
+      logoWrap.style.cssText =
+        'display:flex;align-items:center;margin-bottom:12px;padding-right:22px;';
+      var logo = document.createElement('img');
+      logo.src = CONFIG.projectSolarLogoUrl;
+      logo.alt = 'Project Solar';
+      logo.style.cssText = 'height:26px;width:auto;display:block;';
+      logo.addEventListener('error', function () {
+        logoWrap.style.display = 'none';
+      });
+      logoWrap.appendChild(logo);
+      tip.appendChild(logoWrap);
+    }
 
     if (CONFIG.postcodeTooltipTitle) {
       var title = document.createElement('div');
-      title.style.cssText = 'font-weight:700;margin-bottom:2px;';
+      title.style.cssText =
+        'font-weight:700;font-size:15px;color:#03624C;margin:0 18px 4px 0;';
       title.textContent = CONFIG.postcodeTooltipTitle;
       tip.appendChild(title);
     }
     if (CONFIG.postcodeTooltipBody) {
       var body = document.createElement('div');
-      body.style.cssText = 'font-weight:400;opacity:.95;';
+      body.style.cssText = 'font-weight:400;font-size:13.5px;color:#4b5563;';
       body.textContent = CONFIG.postcodeTooltipBody;
       tip.appendChild(body);
     }
@@ -1807,8 +1826,8 @@
     close.setAttribute('aria-label', 'Dismiss');
     close.textContent = '\u00D7';
     close.style.cssText =
-      'position:absolute;top:6px;right:8px;background:transparent;border:0;color:#ffffff;' +
-      'font-size:20px;line-height:1;cursor:pointer;padding:2px 6px;';
+      'position:absolute;top:10px;right:10px;background:transparent;border:0;color:#9ca3af;' +
+      'font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px;';
     close.addEventListener('click', function () {
       hidePostcodeTooltip();
     });
@@ -1821,10 +1840,11 @@
   function showPostcodeTooltip(preferredIFrameId) {
     var el = ensurePostcodeTooltip(preferredIFrameId);
     if (!el) return;
-    // Force reflow so the opacity transition runs.
+    // Force reflow so the entrance transition runs.
     void el.offsetWidth;
     el.style.opacity = '1';
-    log('Postcode slot tooltip shown');
+    el.style.transform = 'translateX(-50%) translateY(0)';
+    log('Postcode tooltip shown');
     if (CONFIG.postcodeTooltipAutoHideMs && CONFIG.postcodeTooltipAutoHideMs > 0) {
       window.setTimeout(hidePostcodeTooltip, CONFIG.postcodeTooltipAutoHideMs);
     }
@@ -1834,15 +1854,15 @@
     var el = document.querySelector('[data-solar-optly-postcode-tooltip="1"]');
     if (!el) return;
     el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(-10px)';
     window.setTimeout(function () {
       if (el && el.parentElement) el.parentElement.removeChild(el);
     }, 300);
   }
 
-  // A value that looks like a real (unmasked) UK postcode: has a letter and a
-  // digit, and no masking asterisks. Rejects redacted values like "********".
   // Called on each pageChanged. Shows the encouragement tooltip once, right
-  // after the user answers the "Postcode:" question. Not gated on live slot
+  // after the user answers the "Postcode:" question — i.e. as the Chameleon
+  // loading step begins, before the email step. Not gated on live slot
   // availability — the cleartext postcode isn't exposed mid-form (Chameleon
   // masks lastAnsweredAnswer and only populates answers at submission).
   function maybeShowPostcodeTooltip(eventObj) {
