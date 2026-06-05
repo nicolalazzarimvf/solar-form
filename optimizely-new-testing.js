@@ -85,7 +85,7 @@
     postcodeTooltipEnabled: true,
     postcodeOverlayBgUrl:
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/tooltip-bkg.jpg',
-    postcodeOverlayMinMs: 1500, // keep the cover up at least this long (avoid flash)
+    postcodeOverlayMinMs: 5500, // keep the cover up at least this long (covers loader + ~4s engagement)
     postcodeOverlaySafetyMs: 12000, // hard auto-hide if no advance event arrives
     postcodeTooltipTitle: 'Good news — you can book online!',
     postcodeTooltipBody:
