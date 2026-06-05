@@ -1860,24 +1860,49 @@
     }, 300);
   }
 
-  // Called on each pageChanged. Shows the encouragement tooltip once, as soon
-  // as the user reaches the "Postcode:" question. We trigger on arrival (not on
-  // answer) because Chameleon emits NO dataLayer event for the loading screen
-  // that sits between the postcode step and the email step — the next event
-  // after the postcode is answered is already the email step. Showing it on
-  // arrival means it's on screen through postcode entry, the loading screen,
-  // and into the email step (it persists until dismissed).
+  // Show the tooltip when the postcode question is answered, identified from the
+  // raw Chameleon `questionAnswered` postMessage (payload.name === 'Postcode:').
+  // This is the PRIMARY trigger: questionAnswered fires the instant the postcode
+  // is submitted — immediately before Chameleon's loading page — so the tooltip
+  // lands on the loader. (The loading page itself emits NO pageChanged: Chameleon
+  // suppresses pageChanged for pages whose currentQuestion resolves to '', which
+  // is the case for a loader-only page.)
+  function maybeShowPostcodeTooltipFromQuestionAnswered(rawData) {
+    if (!CONFIG.postcodeTooltipEnabled) return;
+    if (window.__solarOptlyPostcodeTooltipDone) return;
+
+    var payload;
+    try {
+      payload = JSON.parse(rawData.split(/:(.+)/)[1]);
+    } catch (e) {
+      return;
+    }
+    if (!payload) return;
+
+    var name = normalize(payload.name || '');
+    var isPostcode =
+      name.indexOf('postcode') !== -1 || name.indexOf('post code') !== -1;
+    if (!isPostcode) return;
+
+    window.__solarOptlyPostcodeTooltipDone = true;
+    log('Postcode tooltip: postcode answered (questionAnswered) — showing on loader');
+    showPostcodeTooltip(payload.iFrameId);
+  }
+
+  // FALLBACK trigger on pageChanged, in case the questionAnswered postMessage is
+  // missed. The first pageChanged after the postcode is the email step, with
+  // lastAnsweredQuestion === 'Postcode:'. Only fires if not already shown.
   function maybeShowPostcodeTooltip(eventObj) {
     if (!CONFIG.postcodeTooltipEnabled) return;
     if (window.__solarOptlyPostcodeTooltipDone) return;
 
-    var current = normalize((eventObj && eventObj.currentQuestion) || '');
-    var onPostcodeStep =
-      current.indexOf('postcode') !== -1 || current.indexOf('post code') !== -1;
-    if (!onPostcodeStep) return;
+    var lastQ = normalize((eventObj && eventObj.lastAnsweredQuestion) || '');
+    var justAnsweredPostcode =
+      lastQ.indexOf('postcode') !== -1 || lastQ.indexOf('post code') !== -1;
+    if (!justAnsweredPostcode) return;
 
     window.__solarOptlyPostcodeTooltipDone = true;
-    log('Postcode tooltip: reached postcode step — showing tooltip');
+    log('Postcode tooltip: postcode answered (pageChanged fallback) — showing tooltip');
     showPostcodeTooltip(eventObj && eventObj.iFrameId);
   }
 
@@ -2064,6 +2089,12 @@
             heightLog('captured Chameleon resizeWidget height', window.__solarOptlyChameleonHeight);
           }
         } catch (e) { /* ignore */ }
+      }
+
+      // Primary tooltip trigger: the postcode answer lands here just before the
+      // (event-less) Chameleon loading page, so the tooltip shows on the loader.
+      if (data.indexOf('questionAnswered:') === 0) {
+        maybeShowPostcodeTooltipFromQuestionAnswered(data);
       }
 
       if (!window.__solarOptlySubmitStageArmed) return;
