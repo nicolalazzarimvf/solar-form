@@ -1860,22 +1860,24 @@
     }, 300);
   }
 
-  // Called on each pageChanged. Shows the encouragement tooltip once, right
-  // after the user answers the "Postcode:" question — i.e. as the Chameleon
-  // loading step begins, before the email step. Not gated on live slot
-  // availability — the cleartext postcode isn't exposed mid-form (Chameleon
-  // masks lastAnsweredAnswer and only populates answers at submission).
+  // Called on each pageChanged. Shows the encouragement tooltip once, as soon
+  // as the user reaches the "Postcode:" question. We trigger on arrival (not on
+  // answer) because Chameleon emits NO dataLayer event for the loading screen
+  // that sits between the postcode step and the email step — the next event
+  // after the postcode is answered is already the email step. Showing it on
+  // arrival means it's on screen through postcode entry, the loading screen,
+  // and into the email step (it persists until dismissed).
   function maybeShowPostcodeTooltip(eventObj) {
     if (!CONFIG.postcodeTooltipEnabled) return;
     if (window.__solarOptlyPostcodeTooltipDone) return;
 
-    var lastQ = normalize((eventObj && eventObj.lastAnsweredQuestion) || '');
-    var justAnsweredPostcode =
-      lastQ.indexOf('postcode') !== -1 || lastQ.indexOf('post code') !== -1;
-    if (!justAnsweredPostcode) return;
+    var current = normalize((eventObj && eventObj.currentQuestion) || '');
+    var onPostcodeStep =
+      current.indexOf('postcode') !== -1 || current.indexOf('post code') !== -1;
+    if (!onPostcodeStep) return;
 
     window.__solarOptlyPostcodeTooltipDone = true;
-    log('Postcode tooltip: postcode step answered — showing tooltip');
+    log('Postcode tooltip: reached postcode step — showing tooltip');
     showPostcodeTooltip(eventObj && eventObj.iFrameId);
   }
 
