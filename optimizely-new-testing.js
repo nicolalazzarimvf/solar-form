@@ -74,19 +74,22 @@
     },
     projectSolarLogoUrl:
       'https://images-ulpn.ecs.prd9.eu-west-1.mvfglobal.net/wp-content/uploads/2025/10/Project-Solar-long-full-colour-without-tag.svg',
-    // --- Post-postcode encouragement tooltip (engagement experiment) ---
-    // Shown over the Chameleon widget right after the user answers the
-    // "Postcode:" question, to lift drop-off into the appointment-booking stage.
-    // NOTE: This is NOT gated on live slot availability. Chameleon masks the
-    // postcode mid-form (lastAnsweredAnswer === '********') and does not expose
-    // the answers object until submission, so the cleartext postcode is not
-    // available in time to run a per-area slot check here.
+    // --- Post-postcode loader cover (engagement experiment) ---
+    // A full-iframe branded cover shown over Chameleon's (event-less) loading
+    // screen, triggered the moment the postcode is answered. It auto-hides when
+    // the form advances to the next step (or after a safety timeout) so it never
+    // blocks the form. Goal: lift drop-off into the appointment-booking stage.
+    // NOTE: not gated on live slot availability — Chameleon masks the postcode
+    // mid-form and only exposes answers at submission.
     // TODO(copy): confirm final wording with Luke Brown.
     postcodeTooltipEnabled: true,
-    postcodeTooltipAutoHideMs: 0, // 0 = persist until dismissed / form advances
-    postcodeTooltipTitle: "We've teamed up with Project Solar",
+    postcodeOverlayBgUrl:
+      'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/tooltip-bkg.jpg',
+    postcodeOverlayMinMs: 1500, // keep the cover up at least this long (avoid flash)
+    postcodeOverlaySafetyMs: 12000, // hard auto-hide if no advance event arrives
+    postcodeTooltipTitle: 'Good news — you can book online!',
     postcodeTooltipBody:
-      'Complete a few more quick questions to see if you qualify to book your solar appointment directly online.',
+      "You're moments away. Answer a few quick questions and choose an appointment time that suits you — directly with Project Solar.",
   };
 
   // Override from window.__solarOptlyConfig (set before script loads)
@@ -1764,6 +1767,27 @@
   // Injected over the Chameleon widget (parent DOM) once we know the entered
   // postcode is serviceable AND has bookable slots. Non-blocking + dismissible
   // so the user can keep filling the form.
+  // Warm the browser cache for the cover background so it's ready when shown.
+  function preloadPostcodeOverlayBg() {
+    if (window.__solarOptlyPostcodeBgPreloaded) return;
+    if (!CONFIG.postcodeOverlayBgUrl) return;
+    window.__solarOptlyPostcodeBgPreloaded = true;
+    var img = new Image();
+    img.src = CONFIG.postcodeOverlayBgUrl;
+    log('Postcode loader cover: preloading background');
+  }
+
+  // Position the cover to exactly overlap the Chameleon iframe within its parent.
+  function positionPostcodeOverlay(el, targetIframe, parent) {
+    var ir = targetIframe.getBoundingClientRect();
+    var pr = parent.getBoundingClientRect();
+    el.style.top = ir.top - pr.top + 'px';
+    el.style.left = ir.left - pr.left + 'px';
+    el.style.width = ir.width + 'px';
+    el.style.height = ir.height + 'px';
+  }
+
+  // Builds a full-iframe branded cover (over Chameleon's loading screen).
   function ensurePostcodeTooltip(preferredIFrameId) {
     var targetIframe = getTargetIframe(preferredIFrameId);
     if (!targetIframe) return null;
@@ -1779,85 +1803,111 @@
       parent.style.position = 'relative';
     }
 
-    var tip = document.createElement('div');
-    tip.setAttribute('data-solar-optly-postcode-tooltip', '1');
-    tip.setAttribute('role', 'status');
-    tip.style.cssText =
-      'position:absolute;top:14px;left:50%;transform:translateX(-50%) translateY(-10px);' +
-      'width:min(380px,92%);box-sizing:border-box;z-index:10001;' +
-      'background:#ffffff;color:#1f2937;padding:16px 18px 16px 18px;border-radius:16px;' +
-      'box-shadow:0 14px 38px rgba(3,98,76,0.20);border:1px solid rgba(3,98,76,0.12);' +
-      'border-top:4px solid #03624C;' +
-      "font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
-      'opacity:0;transition:opacity .28s ease, transform .28s ease;pointer-events:auto;';
+    var cover = document.createElement('div');
+    cover.setAttribute('data-solar-optly-postcode-tooltip', '1');
+    cover.setAttribute('role', 'status');
+    cover.style.cssText =
+      'position:absolute;box-sizing:border-box;z-index:10001;overflow:hidden;' +
+      'border-radius:8px;display:flex;align-items:center;justify-content:center;' +
+      'text-align:center;padding:28px 22px;' +
+      'background-color:#03624C;' +
+      (CONFIG.postcodeOverlayBgUrl
+        ? "background-image:linear-gradient(rgba(3,40,32,0.78),rgba(3,72,57,0.86))," +
+          'url("' + CONFIG.postcodeOverlayBgUrl + '");'
+        : '') +
+      'background-size:cover;background-position:center;background-repeat:no-repeat;' +
+      "font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
+      'color:#ffffff;opacity:0;transition:opacity .35s ease;pointer-events:auto;';
+    positionPostcodeOverlay(cover, targetIframe, parent);
 
-    // Logo row
+    var content = document.createElement('div');
+    content.style.cssText = 'max-width:440px;width:100%;';
+
     if (CONFIG.projectSolarLogoUrl) {
-      var logoWrap = document.createElement('div');
-      logoWrap.style.cssText =
-        'display:flex;align-items:center;margin-bottom:12px;padding-right:22px;';
+      var logoBadge = document.createElement('div');
+      logoBadge.style.cssText =
+        'display:inline-flex;align-items:center;background:#ffffff;border-radius:999px;' +
+        'padding:8px 16px;margin-bottom:20px;box-shadow:0 4px 14px rgba(0,0,0,0.18);';
       var logo = document.createElement('img');
       logo.src = CONFIG.projectSolarLogoUrl;
       logo.alt = 'Project Solar';
-      logo.style.cssText = 'height:26px;width:auto;display:block;';
+      logo.style.cssText = 'height:24px;width:auto;display:block;';
       logo.addEventListener('error', function () {
-        logoWrap.style.display = 'none';
+        logoBadge.style.display = 'none';
       });
-      logoWrap.appendChild(logo);
-      tip.appendChild(logoWrap);
+      logoBadge.appendChild(logo);
+      content.appendChild(logoBadge);
     }
 
     if (CONFIG.postcodeTooltipTitle) {
       var title = document.createElement('div');
       title.style.cssText =
-        'font-weight:700;font-size:15px;color:#03624C;margin:0 18px 4px 0;';
+        'font-weight:800;font-size:26px;line-height:1.2;letter-spacing:-0.01em;' +
+        'margin:0 0 12px 0;text-shadow:0 2px 12px rgba(0,0,0,0.35);';
       title.textContent = CONFIG.postcodeTooltipTitle;
-      tip.appendChild(title);
+      content.appendChild(title);
     }
     if (CONFIG.postcodeTooltipBody) {
       var body = document.createElement('div');
-      body.style.cssText = 'font-weight:400;font-size:13.5px;color:#4b5563;';
+      body.style.cssText =
+        'font-weight:500;font-size:15px;line-height:1.55;opacity:.96;' +
+        'max-width:380px;margin:0 auto;text-shadow:0 1px 8px rgba(0,0,0,0.3);';
       body.textContent = CONFIG.postcodeTooltipBody;
-      tip.appendChild(body);
+      content.appendChild(body);
     }
 
-    var close = document.createElement('button');
-    close.type = 'button';
-    close.setAttribute('aria-label', 'Dismiss');
-    close.textContent = '\u00D7';
-    close.style.cssText =
-      'position:absolute;top:10px;right:10px;background:transparent;border:0;color:#9ca3af;' +
-      'font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px;';
-    close.addEventListener('click', function () {
-      hidePostcodeTooltip();
-    });
-    tip.appendChild(close);
+    cover.appendChild(content);
+    parent.appendChild(cover);
 
-    parent.appendChild(tip);
-    return tip;
+    // Keep the cover aligned to the iframe if it resizes while visible.
+    var reposition = function () {
+      var live = document.querySelector('[data-solar-optly-postcode-tooltip="1"]');
+      if (live) positionPostcodeOverlay(live, targetIframe, parent);
+    };
+    cover.__solarOptlyReposition = reposition;
+    window.addEventListener('resize', reposition);
+    window.setTimeout(reposition, 60);
+    window.setTimeout(reposition, 300);
+
+    return cover;
   }
 
   function showPostcodeTooltip(preferredIFrameId) {
     var el = ensurePostcodeTooltip(preferredIFrameId);
     if (!el) return;
+    window.__solarOptlyPostcodeTooltipShown = true;
+    window.__solarOptlyPostcodeOverlayShownAt = now();
     // Force reflow so the entrance transition runs.
     void el.offsetWidth;
     el.style.opacity = '1';
-    el.style.transform = 'translateX(-50%) translateY(0)';
-    log('Postcode tooltip shown');
-    if (CONFIG.postcodeTooltipAutoHideMs && CONFIG.postcodeTooltipAutoHideMs > 0) {
-      window.setTimeout(hidePostcodeTooltip, CONFIG.postcodeTooltipAutoHideMs);
+    log('Postcode loader cover shown');
+    var safety = CONFIG.postcodeOverlaySafetyMs;
+    if (safety && safety > 0) {
+      window.setTimeout(hidePostcodeTooltip, safety);
     }
   }
 
+  // Hides the cover, honouring a minimum display time so it doesn't just flash
+  // when Chameleon's loader is very quick.
   function hidePostcodeTooltip() {
     var el = document.querySelector('[data-solar-optly-postcode-tooltip="1"]');
     if (!el) return;
+
+    var shownAt = window.__solarOptlyPostcodeOverlayShownAt || 0;
+    var minMs = CONFIG.postcodeOverlayMinMs || 0;
+    var elapsed = now() - shownAt;
+    if (minMs > 0 && elapsed < minMs) {
+      window.setTimeout(hidePostcodeTooltip, minMs - elapsed);
+      return;
+    }
+
+    if (el.__solarOptlyReposition) {
+      window.removeEventListener('resize', el.__solarOptlyReposition);
+    }
     el.style.opacity = '0';
-    el.style.transform = 'translateX(-50%) translateY(-10px)';
     window.setTimeout(function () {
       if (el && el.parentElement) el.parentElement.removeChild(el);
-    }, 300);
+    }, 350);
   }
 
   // Show the tooltip when the postcode question is answered, identified from the
@@ -1889,21 +1939,15 @@
     showPostcodeTooltip(payload.iFrameId);
   }
 
-  // FALLBACK trigger on pageChanged, in case the questionAnswered postMessage is
-  // missed. The first pageChanged after the postcode is the email step, with
-  // lastAnsweredQuestion === 'Postcode:'. Only fires if not already shown.
-  function maybeShowPostcodeTooltip(eventObj) {
-    if (!CONFIG.postcodeTooltipEnabled) return;
-    if (window.__solarOptlyPostcodeTooltipDone) return;
-
-    var lastQ = normalize((eventObj && eventObj.lastAnsweredQuestion) || '');
-    var justAnsweredPostcode =
-      lastQ.indexOf('postcode') !== -1 || lastQ.indexOf('post code') !== -1;
-    if (!justAnsweredPostcode) return;
-
-    window.__solarOptlyPostcodeTooltipDone = true;
-    log('Postcode tooltip: postcode answered (pageChanged fallback) — showing tooltip');
-    showPostcodeTooltip(eventObj && eventObj.iFrameId);
+  // Called on each pageChanged. If the loader cover is currently up, a pageChanged
+  // means Chameleon has finished loading and advanced to the next step, so we hide
+  // the cover (it must never block the form). We intentionally do NOT show the
+  // cover from here: it is a loader cover, and showing it on the email step would
+  // obscure the email form. The questionAnswered postMessage is the sole trigger.
+  function maybeHidePostcodeTooltipOnAdvance() {
+    if (!window.__solarOptlyPostcodeTooltipShown) return;
+    log('Postcode loader cover: form advanced past loader — hiding');
+    hidePostcodeTooltip();
   }
 
   function processDataLayerEvent(eventObj) {
@@ -1945,7 +1989,12 @@
       if (question === 'phone number' && eventObj.iFrameId) {
         ensureSubmitOverlay(eventObj.iFrameId);
       }
-      maybeShowPostcodeTooltip(eventObj);
+      // Preload the loader-cover background while the user is on the postcode
+      // step, so it's cached before the cover shows on the (brief) loader.
+      if (question.indexOf('postcode') !== -1 || question.indexOf('post code') !== -1) {
+        preloadPostcodeOverlayBg();
+      }
+      maybeHidePostcodeTooltipOnAdvance();
     }
 
     if (
