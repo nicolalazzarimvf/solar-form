@@ -1767,6 +1767,15 @@
   // Injected over the Chameleon widget (parent DOM) once we know the entered
   // postcode is serviceable AND has bookable slots. Non-blocking + dismissible
   // so the user can keep filling the form.
+  // Inject the spinner keyframes once (inline styles can't define @keyframes).
+  function ensurePostcodeSpinnerKeyframes() {
+    if (document.getElementById('solar-optly-spin-style')) return;
+    var style = document.createElement('style');
+    style.id = 'solar-optly-spin-style';
+    style.textContent = '@keyframes solarOptlySpin{to{transform:rotate(360deg)}}';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   // Warm the browser cache for the cover background so it's ready when shown.
   function preloadPostcodeOverlayBg() {
     if (window.__solarOptlyPostcodeBgPreloaded) return;
@@ -1855,6 +1864,15 @@
       body.textContent = CONFIG.postcodeTooltipBody;
       content.appendChild(body);
     }
+
+    ensurePostcodeSpinnerKeyframes();
+    var spinner = document.createElement('div');
+    spinner.setAttribute('aria-hidden', 'true');
+    spinner.style.cssText =
+      'width:36px;height:36px;margin:26px auto 0;border-radius:50%;' +
+      'border:3px solid rgba(255,255,255,0.35);border-top-color:#ffffff;' +
+      'animation:solarOptlySpin .8s linear infinite;';
+    content.appendChild(spinner);
 
     cover.appendChild(content);
     parent.appendChild(cover);
