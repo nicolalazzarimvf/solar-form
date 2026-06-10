@@ -21,6 +21,8 @@ export type Last7DaysRecap = {
   startedForm: number;
   /** Distinct submissions that reached booking success (at any point) in the same window. */
   booked: number;
+  /** Distinct submissions that reached the appointment-slot page (booked or not). */
+  reachedBooking: number;
   /** Distinct submissions that reached the appointment-slot page but never booked. */
   reachedBookingNoBooking: number;
   /** Average time on form (seconds) per submission: first event -> last event. */
@@ -77,6 +79,7 @@ const RECAP_SQL = `
     COUNT(*) FILTER (WHERE saw)::bigint AS saw_solar_form,
     COUNT(*) FILTER (WHERE started)::bigint AS started_form,
     COUNT(*) FILTER (WHERE booked)::bigint AS booked,
+    COUNT(*) FILTER (WHERE reached_booking)::bigint AS reached_booking,
     COUNT(*) FILTER (WHERE reached_booking AND NOT booked)::bigint AS reached_booking_no_booking,
     COALESCE(AVG(EXTRACT(EPOCH FROM (last_at - first_at))), 0) AS avg_seconds,
     COALESCE(
@@ -116,6 +119,7 @@ export async function fetchLast7DaysRecap(pool: Pool, range?: RecapRangeInput): 
     saw_solar_form: string;
     started_form: string;
     booked: string;
+    reached_booking: string;
     reached_booking_no_booking: string;
     avg_seconds: string;
     median_seconds: string;
@@ -127,6 +131,7 @@ export async function fetchLast7DaysRecap(pool: Pool, range?: RecapRangeInput): 
     sawSolarForm: Number(r?.saw_solar_form ?? 0),
     startedForm: Number(r?.started_form ?? 0),
     booked: Number(r?.booked ?? 0),
+    reachedBooking: Number(r?.reached_booking ?? 0),
     reachedBookingNoBooking: Number(r?.reached_booking_no_booking ?? 0),
     avgSecondsOnForm: Number(r?.avg_seconds ?? 0),
     medianSecondsOnForm: Number(r?.median_seconds ?? 0),

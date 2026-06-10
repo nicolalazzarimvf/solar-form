@@ -200,6 +200,42 @@ export default async function HomePage({
                       </dd>
                     </Link>
                   </dl>
+                  <div className="mt-3 rounded-md bg-white/70 p-3 dark:bg-zinc-950/50">
+                    <h4 className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-300/80">
+                      Funnel (share of total users)
+                    </h4>
+                    <div className="mt-2 space-y-1.5">
+                      {[
+                        { label: 'Total users', value: recap.totalUsers },
+                        { label: 'Saw the form', value: recap.sawSolarForm },
+                        { label: 'Started', value: recap.startedForm },
+                        { label: 'Reached booking', value: recap.reachedBooking },
+                        { label: 'Booked', value: recap.booked },
+                      ].map((stage) => {
+                        const pct = recap.totalUsers > 0 ? (stage.value / recap.totalUsers) * 100 : 0;
+                        const width = stage.value > 0 ? Math.max(pct, 2) : 0;
+                        return (
+                          <div key={stage.label} className="flex items-center gap-2">
+                            <span className="w-24 shrink-0 text-[11px] text-emerald-900/80 dark:text-emerald-300/80">
+                              {stage.label}
+                            </span>
+                            <div className="relative h-5 flex-1 overflow-hidden rounded bg-emerald-100/70 dark:bg-emerald-950/50">
+                              <div
+                                className="h-full rounded bg-gradient-to-r from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-400"
+                                style={{ width: `${width}%` }}
+                              />
+                            </div>
+                            <span className="w-20 shrink-0 text-right text-[11px] font-semibold tabular-nums text-emerald-900 dark:text-emerald-200">
+                              {fmt(stage.value)}{' '}
+                              <span className="font-normal text-emerald-700/70 dark:text-emerald-400/70">
+                                {pct.toFixed(0)}%
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2 sm:gap-3">
                     <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
                       <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
