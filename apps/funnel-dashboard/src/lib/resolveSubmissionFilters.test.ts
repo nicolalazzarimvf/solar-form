@@ -48,7 +48,7 @@ describe('resolveSubmissionListFilters', () => {
     });
   });
 
-  it('preset defines latest-event booking outcome and keeps q/dates', () => {
+  it('booking_succeeded matches a booking at any point (any_event) and keeps q/dates', () => {
     const { activePreset, filters } = resolveSubmissionListFilters({
       billy_preset: 'booking_succeeded',
       q: 'abc',
@@ -57,10 +57,29 @@ describe('resolveSubmissionListFilters', () => {
     expect(activePreset).toBe('booking_succeeded');
     expect(filters).toEqual({
       q: 'abc',
-      step: 'Confirmation: Booking succeeded',
+      step: '',
+      event_type: '',
+      any_event: {
+        step: 'Confirmation: Booking succeeded',
+        event_type: 'booking_result',
+      },
+      date_from: '2026-01-01',
+      date_to: undefined,
+    });
+  });
+
+  it('latest-event booking outcome (booking_failed) keeps step/event_type, no any_event', () => {
+    const { activePreset, filters } = resolveSubmissionListFilters({
+      billy_preset: 'booking_failed',
+      q: 'abc',
+    });
+    expect(activePreset).toBe('booking_failed');
+    expect(filters).toEqual({
+      q: 'abc',
+      step: 'Confirmation: Booking failed (callback / retry)',
       event_type: 'booking_result',
       any_event: undefined,
-      date_from: '2026-01-01',
+      date_from: undefined,
       date_to: undefined,
     });
   });

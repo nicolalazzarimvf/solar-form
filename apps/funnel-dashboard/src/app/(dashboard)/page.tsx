@@ -49,6 +49,15 @@ export default async function HomePage({
     if (den <= 0) return '0%';
     return `${((num / den) * 100).toFixed(1)}%`;
   };
+  const fmtDuration = (seconds: number) => {
+    const total = Math.max(0, Math.round(seconds));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+    if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+    return `${s}s`;
+  };
 
   return (
     <div>
@@ -59,11 +68,11 @@ export default async function HomePage({
       <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
         Latest activity by Chameleon <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">submissionId</code>
         . Events are recorded from the solar booking iframe after prefill. Quick picks either match the{' '}
-        <strong className="font-medium text-zinc-800 dark:text-zinc-200">latest event</strong> only (booking outcome,
-        confirmation page, slots page, “by event type”) or{' '}
+        <strong className="font-medium text-zinc-800 dark:text-zinc-200">latest event</strong> only (other booking
+        outcomes, confirmation page, slots page, “by event type”) or{' '}
         <strong className="font-medium text-zinc-800 dark:text-zinc-200">any earlier event</strong> for thank-you
-        choices, hard exits, and progress milestones — see each box. Below that, filter by submission ID (partial
-        match) and/or last activity date; open a row for the full event timeline.
+        choices, hard exits, progress milestones, and “Booking succeeded” — see each box. Below that, filter by
+        submission ID (partial match) and/or last activity date; open a row for the full event timeline.
       </p>
 
       <form method="get" className="mb-6 space-y-4">
@@ -225,6 +234,37 @@ export default async function HomePage({
                       </dd>
                     </div>
                   </dl>
+                  <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3 sm:gap-3">
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Reached booking, didn’t book
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmt(recap.reachedBookingNoBooking)}
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Avg time on form
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmtDuration(recap.avgSecondsOnForm)}
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                      <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Median time on form
+                      </dt>
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmtDuration(recap.medianSecondsOnForm)}
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className="mt-1 text-[11px] text-emerald-800/90 dark:text-emerald-400/90">
+                    “Reached booking, didn’t book” = viewed the appointment-slot page but never recorded a successful
+                    booking. Time on form spans the first to last recorded event per submission (including single-event
+                    sessions), so treat it as a lower bound.
+                  </p>
                 </>
               ) : (
                 <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">

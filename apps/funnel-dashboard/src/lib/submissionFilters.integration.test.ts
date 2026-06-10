@@ -110,6 +110,13 @@ describe.skipIf(!hasDbUrl)(
       await assertCountsMatch(submissionFiltersFromSearchParams({ q: '0' }));
     });
 
+    it('matches reference for booked filter (any-event: booking at any point)', async () => {
+      const filters = submissionFiltersFromSearchParams({ billy_preset: 'booking_succeeded' });
+      // booking_succeeded must resolve to an any-event filter (EXISTS branch).
+      expect(filters.any_event?.step).toBe('Confirmation: Booking succeeded');
+      await assertCountsMatch(filters);
+    });
+
     it('fetchSubmissionList length equals count when under LIMIT', async () => {
       const filters = submissionFiltersFromSearchParams({});
       const total = await countMatchingSubmissions(pool, filters);

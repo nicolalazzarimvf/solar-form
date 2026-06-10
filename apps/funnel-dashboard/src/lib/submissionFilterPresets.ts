@@ -117,6 +117,9 @@ export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
   booking_succeeded: {
     step: 'Confirmation: Booking succeeded',
     event_type: 'booking_result',
+    // Match if a booking succeeded at ANY point — users often navigate on
+    // afterwards, which adds a newer page_view and buries the booking row.
+    anyEventMatch: true,
   },
   booking_failed: {
     step: 'Confirmation: Booking failed (callback / retry)',
@@ -187,6 +190,8 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
   },
   {
     title: 'Booking outcome',
+    description:
+      '"Booking succeeded" matches if a booking was recorded at any point. The other outcomes match the latest recorded event.',
     options: [
       { value: 'booking_succeeded', label: 'Booking succeeded' },
       { value: 'booking_failed', label: 'Booking failed (callback / retry)' },
@@ -197,7 +202,7 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
   {
     title: 'Confirmation page',
     description:
-      'Last event is a page view on /confirmation. Matches “reached confirmation”; “Booking succeeded” needs API success as the latest event.',
+      'Last event is a page view on /confirmation. Matches “reached confirmation”. To find completed bookings use “Booking succeeded” (matches at any point).',
     options: [{ value: 'page_confirmation', label: 'Reached confirmation page' }],
   },
   {
