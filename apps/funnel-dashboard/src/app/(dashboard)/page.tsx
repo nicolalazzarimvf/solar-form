@@ -3,7 +3,7 @@ import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
 import { FindSlotsCta } from '@/components/FindSlotsCta';
 import { fetchLast7DaysRecap, RECAP_CLICK_PRESETS } from '@/lib/last7DaysRecap';
-import { fetchSubmissionList } from '@/lib/submissionListQuery';
+import { countMatchingSubmissions, fetchSubmissionList } from '@/lib/submissionListQuery';
 import { BILLY_QUICK_GROUPS } from '@/lib/submissionFilterPresets';
 import { resolveSubmissionListFilters, type SubmissionSearchParams } from '@/lib/resolveSubmissionFilters';
 
@@ -26,12 +26,22 @@ export default async function HomePage({
     Boolean((filters.date_from ?? '').trim()) ||
     Boolean((filters.date_to ?? '').trim());
 
+  const PAGE_SIZE = 50;
+  const requestedPage = Math.max(1, Math.floor(Number(sp.page)) || 1);
+
   let rows: Awaited<ReturnType<typeof fetchSubmissionList>> = [];
   let recap: Awaited<ReturnType<typeof fetchLast7DaysRecap>> | null = null;
+  let totalRows = 0;
+  let currentPage = requestedPage;
   let dbError: string | null = null;
   try {
     const pool = getPool();
-    rows = await fetchSubmissionList(pool, filters);
+    totalRows = await countMatchingSubmissions(pool, filters);
+    currentPage = Math.min(requestedPage, Math.max(1, Math.ceil(totalRows / PAGE_SIZE)));
+    rows = await fetchSubmissionList(pool, filters, {
+      limit: PAGE_SIZE,
+      offset: (currentPage - 1) * PAGE_SIZE,
+    });
     try {
       recap = await fetchLast7DaysRecap(pool, {
         dateFrom: recapDateFrom,
@@ -43,6 +53,19 @@ export default async function HomePage({
   } catch (e) {
     dbError = e instanceof Error ? e.message : 'Database error';
   }
+
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  const pageStart = totalRows === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(currentPage * PAGE_SIZE, totalRows);
+  const pageHref = (p: number) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (k !== 'page' && typeof v === 'string' && v.trim() !== '') params.set(k, v);
+    }
+    if (p > 1) params.set('page', String(p));
+    const qs = params.toString();
+    return qs ? `/?${qs}` : '/';
+  };
 
   const fmt = (n: number) => new Intl.NumberFormat().format(n);
   const fmtPct = (num: number, den: number) => {
@@ -426,6 +449,50 @@ export default async function HomePage({
           </tbody>
         </table>
       </div>
+
+      {!dbError && (
+        <nav
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm"
+          aria-label="Submissions pagination"
+        >
+          <span className="text-zinc-600 dark:text-zinc-400">
+            {totalRows === 0
+              ? 'No results'
+              : `Showing ${fmt(pageStart)}–${fmt(pageEnd)} of ${fmt(totalRows)}`}
+          </span>
+          <div className="flex items-center gap-1">
+            {currentPage > 1 ? (
+              <Link
+                href={pageHref(currentPage - 1)}
+                rel="prev"
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-900"
+              >
+                ← Prev
+              </Link>
+            ) : (
+              <span className="cursor-not-allowed rounded-md border border-zinc-200 px-3 py-1.5 text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
+                ← Prev
+              </span>
+            )}
+            <span className="px-2 text-zinc-600 tabular-nums dark:text-zinc-400">
+              Page {fmt(currentPage)} of {fmt(totalPages)}
+            </span>
+            {currentPage < totalPages ? (
+              <Link
+                href={pageHref(currentPage + 1)}
+                rel="next"
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-900"
+              >
+                Next →
+              </Link>
+            ) : (
+              <span className="cursor-not-allowed rounded-md border border-zinc-200 px-3 py-1.5 text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
+                Next →
+              </span>
+            )}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

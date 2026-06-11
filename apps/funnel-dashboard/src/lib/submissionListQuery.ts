@@ -124,9 +124,10 @@ export function mapSubmissionWhereForLatestSubquery(whereClause: string): string
 export async function fetchSubmissionList(
   pool: Pool,
   filters: SubmissionListFilters,
-  options: { limit?: number } = {}
+  options: { limit?: number; offset?: number } = {}
 ): Promise<SubmissionListRow[]> {
-  const limit = options.limit ?? 200;
+  const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+  const offset = Math.max(options.offset ?? 0, 0);
   const { whereClause, params } = buildSubmissionListWhereClause(filters);
   const sql = `
     SELECT s.submission_id,
@@ -139,7 +140,7 @@ export async function fetchSubmissionList(
     ${SUBMISSION_LIST_BASE}
     ${whereClause}
     ORDER BY s.last_at DESC
-    LIMIT ${Math.min(Math.max(limit, 1), 500)}
+    LIMIT ${limit} OFFSET ${offset}
   `;
   const { rows } = await pool.query<SubmissionListRow>(sql, params.length ? params : undefined);
   return rows;

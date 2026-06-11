@@ -20,6 +20,7 @@ export type SubmissionSearchParams = {
   recap_date_from?: string;
   recap_date_to?: string;
   billy_preset?: string;
+  page?: string;
 };
 
 /** YYYY-MM-DD only; returns undefined if invalid or empty. */
