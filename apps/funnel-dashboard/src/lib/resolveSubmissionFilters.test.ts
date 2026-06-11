@@ -84,6 +84,23 @@ describe('resolveSubmissionListFilters', () => {
     });
   });
 
+  it('reached_no_booking combines an any_event match with a not_any_event exclusion', () => {
+    const { activePreset, filters } = resolveSubmissionListFilters({
+      billy_preset: 'reached_no_booking',
+    });
+    expect(activePreset).toBe('reached_no_booking');
+    expect(filters.step).toBe('');
+    expect(filters.event_type).toBe('');
+    expect(filters.any_event).toEqual({
+      step: 'Page: Choose appointment slot',
+      event_type: 'page_view',
+    });
+    expect(filters.not_any_event).toEqual({
+      step: 'Confirmation: Booking succeeded',
+      event_type: 'booking_result',
+    });
+  });
+
   it('preset with anyEventMatch uses any_event and clears step/event_type on latest', () => {
     const { filters } = resolveSubmissionListFilters({ billy_preset: 'thank_book_online' });
     expect(filters.step).toBe('');

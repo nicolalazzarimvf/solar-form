@@ -117,6 +117,14 @@ describe.skipIf(!hasDbUrl)(
       await assertCountsMatch(filters);
     });
 
+    it('matches reference for reached-but-not-booked (EXISTS slots AND NOT EXISTS booking)', async () => {
+      const filters = submissionFiltersFromSearchParams({ billy_preset: 'reached_no_booking' });
+      // Compound preset: positive any-event (slots) plus a not_any_event exclusion (booking).
+      expect(filters.any_event?.step).toBe('Page: Choose appointment slot');
+      expect(filters.not_any_event?.step).toBe('Confirmation: Booking succeeded');
+      await assertCountsMatch(filters);
+    });
+
     it('fetchSubmissionList length equals count when under LIMIT', async () => {
       const filters = submissionFiltersFromSearchParams({});
       const total = await countMatchingSubmissions(pool, filters);

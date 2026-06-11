@@ -41,6 +41,10 @@ export function buildSubmissionListWhereClause(filters: SubmissionListFilters): 
   const anyStep = (anyEv?.step ?? '').trim();
   const anyEt = (anyEv?.event_type ?? '').trim();
   const useAnyEvent = Boolean(anyStep || anyEt);
+  const notAnyEv = filters.not_any_event;
+  const notStep = (notAnyEv?.step ?? '').trim();
+  const notEt = (notAnyEv?.event_type ?? '').trim();
+  const useNotAnyEvent = Boolean(notStep || notEt);
   const dateFrom = parseDateParam(filters.date_from);
   const dateTo = parseDateParam(filters.date_to);
 
@@ -77,6 +81,20 @@ export function buildSubmissionListWhereClause(filters: SubmissionListFilters): 
       params.push(`%${eventType}%`);
       i += 1;
     }
+  }
+  if (useNotAnyEvent) {
+    const notParts = ['j.submission_id = s.submission_id'];
+    if (notStep) {
+      notParts.push(`j.step ILIKE $${i}`);
+      params.push(`%${notStep}%`);
+      i += 1;
+    }
+    if (notEt) {
+      notParts.push(`j.event_type ILIKE $${i}`);
+      params.push(`%${notEt}%`);
+      i += 1;
+    }
+    conditions.push(`NOT EXISTS (SELECT 1 FROM journey_events j WHERE ${notParts.join(' AND ')})`);
   }
   if (dateFrom) {
     conditions.push(`s.last_at >= $${i}::date`);

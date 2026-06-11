@@ -8,6 +8,8 @@ export type SubmissionListFilters = {
   date_to?: string;
   /** Match submissions that have at least one event matching (ILIKE), not only the latest row. */
   any_event?: { step?: string; event_type?: string };
+  /** Exclude submissions that have at least one event matching (ILIKE) — compound "AND NOT". */
+  not_any_event?: { step?: string; event_type?: string };
 };
 
 /** Allowed GET params for the submissions list (stray `step` / `event_type` in the URL are ignored). */
@@ -52,6 +54,9 @@ export function resolveSubmissionListFilters(sp: SubmissionSearchParams): {
         event_type: useAny ? '' : slice.event_type !== undefined ? slice.event_type : '',
         any_event: useAny
           ? { step: slice.step ?? '', event_type: slice.event_type ?? '' }
+          : undefined,
+        not_any_event: slice.notAnyEvent
+          ? { step: slice.notAnyEvent.step ?? '', event_type: slice.notAnyEvent.event_type ?? '' }
           : undefined,
         date_from: sp.date_from,
         date_to: sp.date_to,

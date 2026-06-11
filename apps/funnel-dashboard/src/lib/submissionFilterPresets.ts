@@ -97,6 +97,8 @@ export type BillyQuickSlice = Partial<{
   step: string;
   event_type: string;
   anyEventMatch: boolean;
+  /** Exclude submissions that have ANY event matching this step/event_type (compound "AND NOT"). */
+  notAnyEvent: { step?: string; event_type?: string };
 }>;
 
 export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
@@ -161,6 +163,14 @@ export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
   page_slots: {
     step: 'Page: Choose appointment slot',
     event_type: 'page_view',
+  },
+  reached_no_booking: {
+    // Reached the appointment-slot page at any point...
+    step: 'Page: Choose appointment slot',
+    event_type: 'page_view',
+    anyEventMatch: true,
+    // ...but never recorded a successful booking.
+    notAnyEvent: { step: 'Confirmation: Booking succeeded', event_type: 'booking_result' },
   },
   page_confirmation: {
     step: 'Page: Booking confirmation / outcome',
@@ -228,6 +238,12 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
     title: 'Stopped on page (last event)',
     description: 'Latest event is a page view on this step.',
     options: [{ value: 'page_slots', label: 'Choose appointment slot' }],
+  },
+  {
+    title: 'Booking page drop-off',
+    description:
+      'Reached the appointment-slot page at any point but never recorded a successful booking.',
+    options: [{ value: 'reached_no_booking', label: 'Reached booking, didn’t book' }],
   },
   {
     title: 'By last event type',

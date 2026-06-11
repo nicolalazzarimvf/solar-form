@@ -271,14 +271,17 @@ export default async function HomePage({
                     </div>
                   </dl>
                   <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3 sm:gap-3">
-                    <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
+                    <Link
+                      href={`/?billy_preset=${RECAP_CLICK_PRESETS.reachedNoBooking}`}
+                      className="group rounded-md border border-transparent bg-white/80 px-2 py-1.5 transition hover:border-emerald-300 hover:bg-white dark:bg-zinc-950/50 dark:hover:border-emerald-800"
+                    >
                       <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         Reached booking, didn’t book
                       </dt>
-                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                      <dd className="mt-0.5 font-semibold tabular-nums text-zinc-900 group-hover:text-emerald-800 dark:text-zinc-100 dark:group-hover:text-emerald-300">
                         {fmt(recap.reachedBookingNoBooking)}
                       </dd>
-                    </div>
+                    </Link>
                     <div className="rounded-md bg-white/80 px-2 py-1.5 dark:bg-zinc-950/50">
                       <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         Avg time on form

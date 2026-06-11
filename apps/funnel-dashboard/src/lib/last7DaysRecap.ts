@@ -6,6 +6,7 @@ export const RECAP_CLICK_PRESETS = {
   sawSolarForm: 'page_thank_you',
   startedForm: 'thank_book_online',
   bookingSucceeded: 'booking_succeeded',
+  reachedNoBooking: 'reached_no_booking',
 } as const;
 
 function ilikeContains(value: string): string {
