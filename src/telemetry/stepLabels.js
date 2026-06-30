@@ -32,6 +32,10 @@ export const STEPS = {
   SOLAR_DISQUALIFIED: 'Solar: Did not meet roof/panel rules — exit',
   SOLAR_PASSED: 'Solar: Qualified — continue to eligibility',
   SOLAR_ROOF_CHANGED_YES: 'Solar: Roof changed since imagery — journey ended',
+  SOLAR_ROOF_CHANGED_AWAITING_TYPE: 'Solar: Roof changed — awaiting change type',
+  SOLAR_ROOF_CHANGE_HOUSE_EXTENSION: 'Solar: Roof change — house extension (continue)',
+  SOLAR_ROOF_CHANGE_ROOF_REPAIRS: 'Solar: Roof change — roof repairs (continue)',
+  SOLAR_ROOF_CHANGE_LOFT_CONVERSION: 'Solar: Roof change — loft conversion (callback)',
 
   ELIGIBILITY_RESULT: (eligible) =>
     eligible

@@ -44,6 +44,7 @@ const DEFAULT_STATE = {
   imageryDate: '',
   imageryProcessedDate: '',
   roofChangedSinceImagery: null,
+  roofChangeType: null,
   carbonOffset: 0,
   solarRoofArea: 0,
   sunExposureHours: 0,

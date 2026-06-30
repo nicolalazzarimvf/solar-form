@@ -1307,6 +1307,7 @@
               'session_expired': 'session_expired',
               'disqualified': 'disqualified',
               'roof_changed_since_imagery': 'roof_changed_since_imagery',
+              'roof_loft_conversion': 'roof_loft_conversion',
               'solar_no_segments': 'solar_no_segments',
               'solar_no_coverage': 'solar_no_coverage',
               'solar_api_error': 'solar_api_error',
