@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 2');
+  console.log('cro-693 | Variation 3');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
@@ -1452,6 +1452,8 @@
   }
 
   function setMainPageRowVisibility(shouldShow) {
+    if (!isTypUrl()) return;
+
     if (shouldShow) {
       var earlyHide = document.getElementById('solar-optly-early-hide');
       if (earlyHide) earlyHide.remove();
@@ -1541,6 +1543,8 @@
 
   /** Hide TYP rows: Project Solar “matched / consultation” hero and “Why 50,000… Trust” strip. */
   function hideTypProjectSolarPromoSections(shouldHide) {
+    if (!isTypUrl()) return;
+
     var nodes = document.querySelectorAll('h1, h2, h3, h4, .vc_custom_heading, p');
     var seenRows = [];
     var hiddenCount = 0;
@@ -1599,6 +1603,7 @@
   }
 
   function watchMainPageRowVisibility() {
+    if (!isTypUrl()) return;
     if (window.__solarOptlyMainPageRowObserver) return;
 
     try {
@@ -2363,8 +2368,6 @@
     hideTypProjectSolarPromoSections(true);
     watchMainPageRowVisibility();
     log('On TYP but no fresh eligibility marker; keeping marketing rows hidden until Chameleon completes');
-  } else {
-    watchMainPageRowVisibility();
   }
 
   attachPostMessageInterceptor();
