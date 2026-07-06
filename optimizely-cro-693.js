@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 5');
+  console.log('cro-693 | Variation 8');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
@@ -28,6 +28,25 @@
         );
       }
     } catch (e) { /* ignore */ }
+  })();
+
+  (function injectTypHandoffHide() {
+    var href = String(
+      window.location && window.location.href ? window.location.href : ''
+    );
+    var isTypLike =
+      href.indexOf('/typ/project-solar/appointment/sp-uk/') !== -1 ||
+      href.indexOf('/appointment-booking-form/sp-uk') !== -1;
+    if (!isTypLike) return;
+    if (document.getElementById('solar-optly-typ-handoff-hide')) return;
+
+    var s = document.createElement('style');
+    s.id = 'solar-optly-typ-handoff-hide';
+    s.textContent =
+      '.chameleon-widget-wrapper iframe{visibility:hidden!important;opacity:0!important}' +
+      '#multistep-banner{display:none!important}';
+    (document.head || document.documentElement).appendChild(s);
+    window.__solarOptlyTypHandoffHideActive = true;
   })();
 
   (function startAdvertorialRedirectNeutralizer() {
@@ -832,7 +851,8 @@
       };
       postAppointmentUpdate('failed', 'postcode_not_serviceable');
       hideFullPageSubmitOverlay();
-      revealIframeAfterSwap(eventObj.iFrameId);
+      markHandoffComplete();
+      revealIframeAfterSwap(eventObj.iFrameId, { force: true });
       keepTypSolarMarketingHidden();
       log('Eligible but postcode too short for outward extract', postcode);
       return;
@@ -850,7 +870,8 @@
           };
           postAppointmentUpdate('failed', 'postcode_not_serviceable');
           hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
+          markHandoffComplete();
+          revealIframeAfterSwap(eventObj.iFrameId, { force: true });
           keepTypSolarMarketingHidden();
           log('Postcode outward not in allowlist', outward);
           return 'denied';
@@ -868,7 +889,8 @@
         } else {
           postAppointmentUpdate('failed', 'no_slots');
           hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
+          markHandoffComplete();
+          revealIframeAfterSwap(eventObj.iFrameId, { force: true });
           keepTypSolarMarketingHidden();
           log('Eligible but no slots available; staying on TYP');
         }
@@ -879,7 +901,8 @@
         var step = /allowed list|invalid JSON/i.test(msg) ? 'postcode_allowlist_error' : 'slot_check_error';
         postAppointmentUpdate('failed', step);
         hideFullPageSubmitOverlay();
-        revealIframeAfterSwap(eventObj.iFrameId);
+        markHandoffComplete();
+        revealIframeAfterSwap(eventObj.iFrameId, { force: true });
         keepTypSolarMarketingHidden();
         log('Allowed list or slot check failed', err);
       });
@@ -1083,7 +1106,13 @@
     return true;
   }
 
-  function revealIframeAfterSwap(preferredIFrameId) {
+  function revealIframeAfterSwap(preferredIFrameId, options) {
+    options = options || {};
+    if (!options.force && !canRevealIframeNow()) {
+      log('revealIframeAfterSwap deferred (handoff in flight)');
+      return false;
+    }
+
     var targetIframe = getTargetIframe(preferredIFrameId);
     if (!targetIframe) return false;
 
@@ -1093,6 +1122,8 @@
     targetIframe.removeAttribute('data-solar-optly-swapping');
     hideSwapOverlay(preferredIFrameId);
     hideFullPageSubmitOverlay();
+    hideFullPageOverlay();
+    removeTypHandoffHideStyle();
     return true;
   }
 
@@ -1116,6 +1147,26 @@
     el.style.transition = 'none';
     el.style.opacity = '1';
     el.style.pointerEvents = 'auto';
+  }
+
+  // Full-viewport cover only on TYP redirects (hides Chameleon marketing rows).
+  // On the advertorial modal, widget-level overlays are enough and avoid a blank white page.
+  function showHandoffCover() {
+    if (isTypUrl() || window.__solarOptlyTypHandoffHideActive) {
+      showFullPageOverlay();
+    }
+  }
+
+  function prefetchAppHandoff() {
+    if (window.__solarOptlyAppPrefetched) return;
+    window.__solarOptlyAppPrefetched = true;
+    try {
+      var link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.href = CONFIG.appUrl;
+      (document.head || document.documentElement).appendChild(link);
+      log('Prefetched solar-form loader URL');
+    } catch (e) { /* ignore */ }
   }
 
   function hideFullPageOverlay() {
@@ -1229,6 +1280,41 @@
       }
     }
     heightLog('hideFullPageSubmitOverlay', { restoreHeight: restoreHeight });
+  }
+
+  function hideMultistepBanner() {
+    try {
+      if (
+        window.multistepBanner &&
+        typeof window.multistepBanner.killBanner === 'function'
+      ) {
+        window.multistepBanner.killBanner();
+      }
+    } catch (e) { /* ignore */ }
+    var banner = document.getElementById('multistep-banner');
+    if (banner) {
+      banner.style.setProperty('display', 'none', 'important');
+    }
+    if (!document.getElementById('solar-optly-multistep-banner-hide')) {
+      var s = document.createElement('style');
+      s.id = 'solar-optly-multistep-banner-hide';
+      s.textContent = '#multistep-banner{display:none!important}';
+      (document.head || document.documentElement).appendChild(s);
+    }
+  }
+
+  function removeTypHandoffHideStyle() {
+    var el = document.getElementById('solar-optly-typ-handoff-hide');
+    if (el && el.parentElement) el.parentElement.removeChild(el);
+    window.__solarOptlyTypHandoffHideActive = false;
+  }
+
+  function canRevealIframeNow() {
+    return !window.__solarOptlySlotCheckInFlight;
+  }
+
+  function markHandoffComplete() {
+    window.__solarOptlyHandoffComplete = true;
   }
 
   function ensureSwapOverlay(preferredIFrameId) {
@@ -1382,9 +1468,10 @@
         if (!payload) return;
 
         if (payload.type === 'solar-optly-loader-complete') {
-          revealIframeAfterSwap(preferredIFrameId);
+          markHandoffComplete();
           window.__solarOptlyIframeReadyForReveal = true;
           syncMainPageRowVisibility();
+          hideFullPageSubmitOverlay();
           heightLog('received loader-complete; showing main page rows', {
             iframeId: activeIframe.id,
           });
@@ -1393,9 +1480,10 @@
 
         if (payload.type === 'solar-optly-decision-made') {
           hideFullPageSubmitOverlay();
+          markHandoffComplete();
           window.__solarOptlyIframeReadyForReveal = true;
           syncMainPageRowVisibility();
-          revealIframeAfterSwap(preferredIFrameId);
+          revealIframeAfterSwap(preferredIFrameId, { force: true });
           log('User decided:', payload.choice || '(unknown)');
           if (payload.choice === 'book_online') {
             postAppointmentUpdate('progressing', 'book_online');
@@ -1523,7 +1611,6 @@
         }
 
         applyIframeHeight(payload.height);
-        revealIframeAfterSwap(preferredIFrameId);
       });
       window.__solarOptlyHeightMessageHandlerAttached = true;
     }
@@ -1829,15 +1916,22 @@
       targetIframe.addEventListener('load', function () {
         var current = targetIframe.getAttribute('src') || '';
         if (!isAppUrl(current)) return;
-        revealIframeAfterSwap(preferredIFrameId || targetIframe.id);
+        markHandoffComplete();
+        log('App iframe loaded; revealing solar-form loader');
+        revealIframeAfterSwap(preferredIFrameId || targetIframe.id, { force: true });
       });
       targetIframe.__solarOptlyRevealOnAppLoadAttached = true;
     }
 
-    // Fallback reveal guard in case load/messaging events are delayed.
+    // Safety reveal if load event is missed (cold start / Safari).
     window.setTimeout(function () {
-      revealIframeAfterSwap(preferredIFrameId || targetIframe.id);
-    }, 2500);
+      var current = targetIframe.getAttribute('src') || '';
+      if (!isAppUrl(current) || !window.__solarOptlyIframeInjected) return;
+      if (targetIframe.getAttribute('data-solar-optly-swapping') !== '1') return;
+      log('App iframe safety reveal after 4s');
+      markHandoffComplete();
+      revealIframeAfterSwap(preferredIFrameId || targetIframe.id, { force: true });
+    }, 4000);
 
     attachIframeHeightSync(preferredIFrameId || targetIframe.id);
     syncMainPageRowVisibility();
@@ -1922,6 +2016,8 @@
     swapHeaderLogoToProjectSolar();
     log('Eligibility matched via', context);
     var preferredIFrameId = (eventObj && eventObj.iFrameId) || null;
+    hideMultistepBanner();
+    showHandoffCover();
     if (preferredIFrameId) {
       showSwapOverlay(preferredIFrameId);
       hideIframeDuringSwap(preferredIFrameId);
@@ -2237,6 +2333,7 @@
       window.__solarOptlySubmitStageArmed = question === 'phone number';
       if (question === 'phone number' && eventObj.iFrameId) {
         ensureSubmitOverlay(eventObj.iFrameId);
+        prefetchAppHandoff();
       }
       // Preload the loader-cover background while the user is on the postcode
       // step, so it's cached before the cover shows on the (brief) loader.
@@ -2258,6 +2355,7 @@
     }
 
     if (eventObj.event === 'webform_submission_completed') {
+      hideMultistepBanner();
       var answers = eventObj.answers || {};
       log('Processing webform_submission_completed', {
         answerKeys: Object.keys(answers),
@@ -2273,11 +2371,13 @@
       }
 
       if (isEligible(eventObj.answers || {})) {
+        showHandoffCover();
         var postcode = extractPostcodeFromAnswers(eventObj.answers || {});
         if (!postcode) {
           log('Eligible but no postcode; cannot check slots; staying on TYP');
           hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
+          markHandoffComplete();
+          revealIframeAfterSwap(eventObj.iFrameId, { force: true });
           keepTypSolarMarketingHidden();
           return;
         }
@@ -2290,7 +2390,8 @@
       } else {
         postAppointmentUpdate('failed', 'not_eligible');
         hideFullPageSubmitOverlay();
-        revealIframeAfterSwap(eventObj.iFrameId);
+        markHandoffComplete();
+        revealIframeAfterSwap(eventObj.iFrameId, { force: true });
         keepTypSolarMarketingHidden();
         log('Submission did not match eligibility');
       }
@@ -2315,11 +2416,13 @@
       }
 
       if (isEligible(eventObj.answers || {})) {
+        showHandoffCover();
         var postcode = extractPostcodeFromAnswers(eventObj.answers || {});
         if (!postcode) {
           log('Eligible but no postcode; cannot check slots; staying on TYP');
           hideFullPageSubmitOverlay();
-          revealIframeAfterSwap(eventObj.iFrameId);
+          markHandoffComplete();
+          revealIframeAfterSwap(eventObj.iFrameId, { force: true });
           keepTypSolarMarketingHidden();
           return;
         }
@@ -2346,11 +2449,14 @@
           log('Captured first_name prefill from thankYouPageReached (already qualified)', fn);
         }
         log('Already qualified; injecting solar form on thankYouPageReached');
+        hideMultistepBanner();
+        showHandoffCover();
         swapIframeWhenReady(eventObj.iFrameId);
         lockIframeToApp(eventObj.iFrameId);
       } else {
         hideFullPageSubmitOverlay();
-        revealIframeAfterSwap(eventObj.iFrameId);
+        markHandoffComplete();
+        revealIframeAfterSwap(eventObj.iFrameId, { force: true });
         keepTypSolarMarketingHidden();
         log('thankYouPageReached had no eligible answers and no prior qualification');
       }
@@ -2370,6 +2476,8 @@
 
   function showSubmitOverlays(iFrameId, source) {
     log('Submit Flow: OVERLAY TRIGGERED (' + source + ')');
+    hideMultistepBanner();
+    showHandoffCover();
     hideIframeDuringSwap(iFrameId);
     showFullPageSubmitOverlay(iFrameId);
     showSwapOverlay(iFrameId);
@@ -2499,8 +2607,11 @@
     window.__solarOptlyQualified = true;
     window.__solarOptlyIframeReadyForReveal = false;
     hideIframeDuringSwap();
+    showHandoffCover();
+    showSwapOverlay();
     syncMainPageRowVisibility();
     hideTypProjectSolarPromoSections(true);
+    hideMultistepBanner();
     watchMainPageRowVisibility();
     log('Eligible marker found on TYP, attempting iframe injection');
     swapIframeWhenReady();
