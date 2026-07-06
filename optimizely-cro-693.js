@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 1');
+  console.log('cro-693 | Variation 2');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
@@ -88,6 +88,8 @@
     },
     projectSolarLogoUrl:
       'https://images-ulpn.ecs.prd9.eu-west-1.mvfglobal.net/wp-content/uploads/2025/10/Project-Solar-long-full-colour-without-tag.svg',
+    ecoExpertsLogoUrl:
+      'https://images-ulpn.ecs.prd9.eu-west-1.mvfglobal.net/mp/wp-content/uploads/sites/3/2022/09/ee-logo.svg',
     // --- Post-postcode loader cover (engagement experiment) ---
     // A full-iframe branded cover shown over Chameleon's (event-less) loading
     // screen, triggered the moment the postcode is answered. It auto-hides when
@@ -101,9 +103,10 @@
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/tooltip-bkg.jpg',
     postcodeOverlayMinMs: 5500, // keep the cover up at least this long (covers loader + ~4s engagement)
     postcodeOverlaySafetyMs: 12000, // hard auto-hide if no advance event arrives
+    postcodeTooltipCollabText: 'in collaboration with',
     postcodeTooltipTitle: 'Looking for appointments in your area',
     postcodeTooltipBody:
-      'Keep going with the form — once you’ve finished, we’ll check whether you can book online with Project Solar.',
+      'Keep going with the form — The Eco Experts and Project Solar are checking whether you can book online in your area.',
   };
 
   // Override from window.__solarOptlyConfig (set before script loads)
@@ -1855,6 +1858,23 @@
     el.style.height = ir.height + 'px';
   }
 
+  function createLoaderLogoBadge(logoUrl, alt, heightPx) {
+    var badge = document.createElement('div');
+    badge.style.cssText =
+      'display:inline-flex;align-items:center;background:#ffffff;border-radius:999px;' +
+      'padding:8px 14px;box-shadow:0 4px 14px rgba(0,0,0,0.18);';
+    var logo = document.createElement('img');
+    logo.src = logoUrl;
+    logo.alt = alt;
+    logo.style.cssText =
+      'height:' + (heightPx || 22) + 'px;width:auto;display:block;max-width:128px;object-fit:contain;';
+    logo.addEventListener('error', function () {
+      badge.style.display = 'none';
+    });
+    badge.appendChild(logo);
+    return badge;
+  }
+
   // Builds a full-iframe branded cover (over Chameleon's loading screen).
   function ensurePostcodeTooltip(preferredIFrameId) {
     var targetIframe = getTargetIframe(preferredIFrameId);
@@ -1889,20 +1909,30 @@
     var content = document.createElement('div');
     content.style.cssText = 'max-width:440px;width:100%;';
 
-    if (CONFIG.projectSolarLogoUrl) {
-      var logoBadge = document.createElement('div');
-      logoBadge.style.cssText =
-        'display:inline-flex;align-items:center;background:#ffffff;border-radius:999px;' +
-        'padding:8px 16px;margin-bottom:20px;box-shadow:0 4px 14px rgba(0,0,0,0.18);';
-      var logo = document.createElement('img');
-      logo.src = CONFIG.projectSolarLogoUrl;
-      logo.alt = 'Project Solar';
-      logo.style.cssText = 'height:24px;width:auto;display:block;';
-      logo.addEventListener('error', function () {
-        logoBadge.style.display = 'none';
-      });
-      logoBadge.appendChild(logo);
-      content.appendChild(logoBadge);
+    if (CONFIG.ecoExpertsLogoUrl || CONFIG.projectSolarLogoUrl) {
+      var collabRow = document.createElement('div');
+      collabRow.style.cssText =
+        'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;' +
+        'margin:0 auto 20px auto;max-width:400px;';
+      if (CONFIG.ecoExpertsLogoUrl) {
+        collabRow.appendChild(
+          createLoaderLogoBadge(CONFIG.ecoExpertsLogoUrl, 'The Eco Experts', 22)
+        );
+      }
+      if (CONFIG.postcodeTooltipCollabText) {
+        var collabText = document.createElement('span');
+        collabText.style.cssText =
+          'font-size:13px;font-weight:500;line-height:1.35;opacity:0.95;' +
+          'text-shadow:0 1px 6px rgba(0,0,0,0.25);';
+        collabText.textContent = CONFIG.postcodeTooltipCollabText;
+        collabRow.appendChild(collabText);
+      }
+      if (CONFIG.projectSolarLogoUrl) {
+        collabRow.appendChild(
+          createLoaderLogoBadge(CONFIG.projectSolarLogoUrl, 'Project Solar', 22)
+        );
+      }
+      content.appendChild(collabRow);
     }
 
     if (CONFIG.postcodeTooltipTitle) {
