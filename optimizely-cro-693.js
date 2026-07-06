@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 3');
+  console.log('cro-693 | Variation 4');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
@@ -1908,7 +1908,7 @@
         : '') +
       'background-size:cover;background-position:center;background-repeat:no-repeat;' +
       "font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
-      'color:#ffffff;opacity:0;transition:opacity .35s ease;pointer-events:auto;';
+      'color:#ffffff;opacity:0;transition:opacity .35s ease;pointer-events:none;';
     positionPostcodeOverlay(cover, targetIframe, mount);
 
     var content = document.createElement('div');
@@ -1983,41 +1983,64 @@
   }
 
   function showPostcodeTooltip(preferredIFrameId) {
-    var el = ensurePostcodeTooltip(preferredIFrameId);
-    if (!el) return;
-    window.__solarOptlyPostcodeTooltipShown = true;
-    window.__solarOptlyPostcodeOverlayShownAt = now();
-    // Force reflow so the entrance transition runs.
-    void el.offsetWidth;
-    el.style.opacity = '1';
-    log('Postcode loader cover shown');
-    var safety = CONFIG.postcodeOverlaySafetyMs;
-    if (safety && safety > 0) {
-      window.setTimeout(hidePostcodeTooltip, safety);
+    if (window.__solarOptlyPostcodeShowTimer) {
+      window.clearTimeout(window.__solarOptlyPostcodeShowTimer);
     }
+    // Brief delay so Chameleon receives the Continue click before we paint over the iframe.
+    window.__solarOptlyPostcodeShowTimer = window.setTimeout(function () {
+      window.__solarOptlyPostcodeShowTimer = null;
+      var el = ensurePostcodeTooltip(preferredIFrameId);
+      if (!el) return;
+      window.__solarOptlyPostcodeTooltipShown = true;
+      window.__solarOptlyPostcodeOverlayShownAt = now();
+      void el.offsetWidth;
+      el.style.opacity = '1';
+      log('Postcode loader cover shown');
+      var safety = CONFIG.postcodeOverlaySafetyMs;
+      if (safety && safety > 0) {
+        window.setTimeout(function () {
+          hidePostcodeTooltip(false);
+        }, safety);
+      }
+    }, 150);
   }
 
-  // Hides the cover, honouring a minimum display time so it doesn't just flash
-  // when Chameleon's loader is very quick.
-  function hidePostcodeTooltip() {
-    var el = document.querySelector('[data-solar-optly-postcode-tooltip="1"]');
-    if (!el) return;
+  // Hides the cover. Pass immediate=true when the form has advanced (never block the next step).
+  function hidePostcodeTooltip(immediate) {
+    if (window.__solarOptlyPostcodeShowTimer) {
+      window.clearTimeout(window.__solarOptlyPostcodeShowTimer);
+      window.__solarOptlyPostcodeShowTimer = null;
+    }
 
-    var shownAt = window.__solarOptlyPostcodeOverlayShownAt || 0;
-    var minMs = CONFIG.postcodeOverlayMinMs || 0;
-    var elapsed = now() - shownAt;
-    if (minMs > 0 && elapsed < minMs) {
-      window.setTimeout(hidePostcodeTooltip, minMs - elapsed);
+    var el = document.querySelector('[data-solar-optly-postcode-tooltip="1"]');
+    if (!el) {
+      window.__solarOptlyPostcodeTooltipShown = false;
       return;
     }
+
+    if (!immediate) {
+      var shownAt = window.__solarOptlyPostcodeOverlayShownAt || 0;
+      var minMs = CONFIG.postcodeOverlayMinMs || 0;
+      var elapsed = now() - shownAt;
+      if (minMs > 0 && elapsed < minMs) {
+        window.setTimeout(function () {
+          hidePostcodeTooltip(false);
+        }, minMs - elapsed);
+        return;
+      }
+    }
+
+    window.__solarOptlyPostcodeTooltipShown = false;
 
     if (el.__solarOptlyReposition) {
       window.removeEventListener('resize', el.__solarOptlyReposition);
     }
+    el.style.pointerEvents = 'none';
     el.style.opacity = '0';
+    var removeDelay = immediate ? 0 : 200;
     window.setTimeout(function () {
       if (el && el.parentElement) el.parentElement.removeChild(el);
-    }, 350);
+    }, removeDelay);
   }
 
   // Show the tooltip when the postcode question is answered, identified from the
@@ -2055,9 +2078,9 @@
   // cover from here: it is a loader cover, and showing it on the email step would
   // obscure the email form. The questionAnswered postMessage is the sole trigger.
   function maybeHidePostcodeTooltipOnAdvance() {
-    if (!window.__solarOptlyPostcodeTooltipShown) return;
-    log('Postcode loader cover: form advanced past loader — hiding');
-    hidePostcodeTooltip();
+    if (!window.__solarOptlyPostcodeTooltipShown && !window.__solarOptlyPostcodeShowTimer) return;
+    log('Postcode loader cover: form advanced — hiding immediately');
+    hidePostcodeTooltip(true);
   }
 
   function processDataLayerEvent(eventObj) {
@@ -2103,8 +2126,12 @@
       // step, so it's cached before the cover shows on the (brief) loader.
       if (question.indexOf('postcode') !== -1 || question.indexOf('post code') !== -1) {
         preloadPostcodeOverlayBg();
+      } else if (
+        question &&
+        (window.__solarOptlyPostcodeTooltipShown || window.__solarOptlyPostcodeShowTimer)
+      ) {
+        maybeHidePostcodeTooltipOnAdvance();
       }
-      maybeHidePostcodeTooltipOnAdvance();
     }
 
     if (
