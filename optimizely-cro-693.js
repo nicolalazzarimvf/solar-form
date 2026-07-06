@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 4');
+  console.log('cro-693 | Variation 5');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
@@ -69,6 +69,9 @@
     getAvailabilityApiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlanBianFqZnhtZWh5dmx3ZWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI2MzMwODYsImV4cCI6MjA0ODIwOTA4Nn0.8pFmhFXMPhVPkSHnVJlWDuey0FUFa0dHHkT8yvYbNJs',
     // Parent-page fetch can exceed 5s (edge cold start, TLS); race was marking no_slots falsely
     slotCheckTimeoutMs: 15000,
+    customerEligibilityTimeoutMs: 10000,
+    customerEligibilityProxyUrl:
+      'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/api/check-customer-eligibility',
     allowedOutwardCodesUrl:
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/allowed-outward-codes.json',
     // Must stay in sync with VITE_PROJECT_SOLAR_MVF_API_KEY (rotated — do not revert to old key).
@@ -212,6 +215,75 @@
       }).join('');
     }
 
+    var phoneHtml = '';
+    if (CONFIG.customerEligibilityEnabled === false) {
+      phoneHtml =
+        '<div style="margin:8px 0;padding:8px;background:#2d2d44;border-radius:6px;">' +
+        '<div style="font-weight:600;font-size:11px;margin-bottom:4px;">Phone check (30d)</div>' +
+        '<div style="font-size:10px;color:#888;">disabled (CONFIG.customerEligibilityEnabled)</div>' +
+        '</div>';
+    } else {
+      var phoneResult = window.__solarOptlyCustomerEligibilityResult;
+      var phoneInFlight = window.__solarOptlyPhoneCheckInFlight;
+      var phoneForUi = window.__solarOptlyPhoneCheckPhone || '';
+      var phoneCheckUrl = window.__solarOptlyPhoneCheckUrl || '';
+      if (phoneResult || phoneInFlight || phoneForUi) {
+        var phoneColor = '#888';
+        var phoneLabel = '—';
+        var phoneDetail = '';
+        if (phoneInFlight && !phoneResult) {
+          phoneLabel = '…';
+          phoneDetail = 'checking...';
+          phoneColor = '#f1c40f';
+        } else if (phoneResult) {
+          if (!phoneResult.ok) {
+            phoneLabel = 'ERR';
+            phoneColor = '#c0392b';
+            phoneDetail = phoneResult.error || 'request failed';
+          } else if (!phoneResult.eligible) {
+            phoneLabel = 'NO';
+            phoneColor = '#c0392b';
+            phoneDetail = phoneResult.reason || 'not eligible';
+            if (phoneResult.customerCreatedAt) {
+              phoneDetail += ' (' + phoneResult.customerCreatedAt + ')';
+            }
+          } else {
+            phoneLabel = 'OK';
+            phoneColor = '#27ae60';
+            phoneDetail = phoneResult.reason || 'eligible';
+          }
+        }
+        var phoneMetaHtml = '';
+        if (phoneForUi) {
+          phoneMetaHtml +=
+            '<div style="font-size:9px;color:#888;margin-top:6px;">phone <span style="color:#ccc;">' +
+            escapeHtml(phoneForUi) +
+            '</span></div>';
+        }
+        if (phoneCheckUrl) {
+          phoneMetaHtml +=
+            '<div style="font-size:9px;color:#9ecba7;margin-top:6px;">GET (eligibility)</div>' +
+            '<div style="font-size:9px;color:#ccc;word-break:break-all;line-height:1.35;">' +
+            escapeHtml(phoneCheckUrl) +
+            '</div>';
+        }
+        phoneHtml =
+          '<div style="margin:8px 0;padding:8px;background:#2d2d44;border-radius:6px;">' +
+          '<div style="font-weight:600;font-size:11px;margin-bottom:4px;">Phone check (30d)</div>' +
+          '<div style="display:flex;align-items:center;gap:6px;">' +
+          '<span style="background:' +
+          phoneColor +
+          ';color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">' +
+          escapeHtml(phoneLabel) +
+          '</span>' +
+          '<span style="font-size:10px;color:#aaa;">' +
+          escapeHtml(phoneDetail) +
+          '</span></div>' +
+          phoneMetaHtml +
+          '</div>';
+      }
+    }
+
     var slotHtml = '';
     var slotResult = window.__solarOptlySlotCheckResult;
     var slotPcForUi = '';
@@ -337,6 +409,7 @@
     var newContent =
       '<div style="margin-bottom:8px;font-weight:700;color:#9ecba7;">Solar Debug</div>' +
       answersRow +
+      phoneHtml +
       slotHtml +
       endpointsHtml +
       appointmentHtml +
@@ -711,6 +784,130 @@
 
     return Promise.race([fetchPromise, timeoutPromise]).catch(function () {
       return false;
+    });
+  }
+
+  function getCustomerEligibilityUrl(phoneE164) {
+    var base = CONFIG.customerEligibilityApiUrl;
+    if (!base) {
+      base =
+        CONFIG.customerEligibilityProxyUrl ||
+        'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/api/check-customer-eligibility';
+    }
+    var sep = base.indexOf('?') === -1 ? '?' : '&';
+    return base + sep + 'phone=' + encodeURIComponent(phoneE164 || '');
+  }
+
+  function failEligibleStayOnTyp(eventObj, step, errorDetail) {
+    window.__solarOptlySlotCheckInFlight = false;
+    postAppointmentUpdate('failed', step, errorDetail);
+    hideFullPageSubmitOverlay();
+    revealIframeAfterSwap(eventObj.iFrameId);
+    keepTypSolarMarketingHidden();
+  }
+
+  function extractPhoneFromAnswers(answers) {
+    if (!answers || typeof answers !== 'object') return '';
+    var raw =
+      extractTextFromAnswers(answers, ['phone_work', 'phone_number', 'phone', 'mobile']) ||
+      extractByKeyPattern(answers, /phone|mobile|tel/i);
+    return normalizePhoneE164(raw || '');
+  }
+
+  function checkCustomerEligibility(phoneE164) {
+    return new Promise(function (resolve) {
+      if (!phoneE164) {
+        resolve({ ok: false, eligible: false, error: 'missing_phone' });
+        return;
+      }
+      var url = getCustomerEligibilityUrl(phoneE164);
+      window.__solarOptlyPhoneCheckInFlight = true;
+      window.__solarOptlyPhoneCheckPhone = phoneE164;
+      window.__solarOptlyPhoneCheckUrl = url;
+      var timeoutMs = CONFIG.customerEligibilityTimeoutMs || 10000;
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timeoutId = null;
+      var settled = false;
+
+      function finish(result) {
+        if (settled) return;
+        settled = true;
+        window.__solarOptlyPhoneCheckInFlight = false;
+        if (timeoutId) window.clearTimeout(timeoutId);
+        resolve(result);
+      }
+
+      timeoutId = window.setTimeout(function () {
+        if (controller) controller.abort();
+        finish({ ok: false, eligible: false, error: 'timeout' });
+      }, timeoutMs);
+
+      var fetchOptions = { method: 'GET' };
+      if (controller) fetchOptions.signal = controller.signal;
+      var isMvfDirect =
+        url.indexOf('sejpbjqjfxmehyvlweil.supabase.co') !== -1 ||
+        url.indexOf('wppwuqfrvtvtnfgwxnbd.supabase.co') !== -1;
+      if (isMvfDirect && CONFIG.getAvailabilityApiKey) {
+        fetchOptions.headers = { Authorization: 'Bearer ' + CONFIG.getAvailabilityApiKey };
+      }
+
+      fetch(url, fetchOptions)
+        .then(function (res) {
+          return res.text().then(function (text) {
+            var data = {};
+            try {
+              data = text ? JSON.parse(text) : {};
+            } catch (parseErr) {
+              data = { _parseError: String(parseErr) };
+            }
+            if (!res.ok) {
+              finish({ ok: false, eligible: false, error: 'HTTP ' + res.status, body: data });
+              return;
+            }
+            finish({
+              ok: true,
+              eligible: data.eligible === true,
+              reason: data.reason || '',
+              customerCreatedAt: data.customerCreatedAt || '',
+            });
+          });
+        })
+        .catch(function (err) {
+          finish({ ok: false, eligible: false, error: String(err) });
+        });
+    });
+  }
+
+  function startEligibleQualificationPipeline(postcode, eventObj, qualifyContext, answers) {
+    if (CONFIG.customerEligibilityEnabled === false) {
+      startEligibleSlotCheck(postcode, eventObj, qualifyContext);
+      return;
+    }
+    var phone = extractPhoneFromAnswers(answers || {});
+    if (!phone && window.__solarOptlyPrefillAnswers) {
+      phone = normalizePhoneE164(window.__solarOptlyPrefillAnswers.phone_number || '');
+    }
+    if (!phone) {
+      log('Customer eligibility: no phone on submission (fail closed)');
+      failEligibleStayOnTyp(eventObj, 'customer_eligibility_no_phone');
+      return;
+    }
+    window.__solarOptlyCustomerEligibilityResult = null;
+    checkCustomerEligibility(phone).then(function (result) {
+      window.__solarOptlyCustomerEligibilityResult = result;
+      if (!result.ok) {
+        log('Customer eligibility API failed (fail closed)', result);
+        failEligibleStayOnTyp(eventObj, 'customer_eligibility_error', result.error);
+        return;
+      }
+      if (!result.eligible) {
+        log('Customer duplicate / recent in PS (30d)', result);
+        failEligibleStayOnTyp(eventObj, 'customer_duplicate_30d', result.reason);
+        return;
+      }
+      log('Customer eligibility OK', result.reason || '');
+      postAppointmentUpdate('progressing', 'customer_eligibility_check');
+      startEligibleSlotCheck(postcode, eventObj, qualifyContext);
     });
   }
 
@@ -2170,7 +2367,12 @@
           return;
         }
         window.__solarOptlySlotCheckInFlight = true;
-        startEligibleSlotCheck(postcode, eventObj, 'webform_submission_completed');
+        startEligibleQualificationPipeline(
+          postcode,
+          eventObj,
+          'webform_submission_completed',
+          answers
+        );
       } else {
         postAppointmentUpdate('failed', 'not_eligible');
         hideFullPageSubmitOverlay();
@@ -2212,7 +2414,12 @@
           return;
         }
         window.__solarOptlySlotCheckInFlight = true;
-        startEligibleSlotCheck(postcode, eventObj, 'thankYouPageReached');
+        startEligibleQualificationPipeline(
+          postcode,
+          eventObj,
+          'thankYouPageReached',
+          typrAnswers
+        );
       } else if (window.__solarOptlyQualified || window.__solarOptlySlotCheckInFlight) {
         if (window.__solarOptlySlotCheckInFlight) {
           log('Slot check in flight; keeping overlay until it resolves');
