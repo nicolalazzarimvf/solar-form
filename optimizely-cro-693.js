@@ -1,7 +1,10 @@
 (function () {
   'use strict';
+  console.log('cro-693 | Variation 1');
+
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
-     Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page. */
+     Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
+     Bump console.log Variation N on every script change. */
 
   window.__solarOptlyChangesAppliedCount =
     (window.__solarOptlyChangesAppliedCount || 0) + 1;
