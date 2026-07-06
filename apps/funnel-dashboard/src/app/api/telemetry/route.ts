@@ -13,20 +13,37 @@ type IngestEvent = {
   payload?: Record<string, unknown>;
 };
 
+/** Known solar-form deploy origins (merged with ALLOWED_CORS_ORIGINS). */
+const BUILTIN_SOLAR_FORM_ORIGINS = [
+  'http://localhost:5173',
+  'https://solar-form-eight.vercel.app',
+  'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app',
+];
+
 function corsHeaders(req: NextRequest): HeadersInit {
   const origin = req.headers.get('origin') ?? '';
-  const allowed = (process.env.ALLOWED_CORS_ORIGINS ?? '')
+  const fromEnv = (process.env.ALLOWED_CORS_ORIGINS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  const allowOrigin =
-    allowed.length === 0 ? '*' : allowed.includes(origin) ? origin : allowed[0];
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
+  const allowed = [...new Set([...BUILTIN_SOLAR_FORM_ORIGINS, ...fromEnv])];
+
+  const base: HeadersInit = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
   };
+
+  if (!origin) {
+    return base;
+  }
+  if (allowed.length === 0) {
+    return { ...base, 'Access-Control-Allow-Origin': '*' };
+  }
+  if (allowed.includes(origin)) {
+    return { ...base, 'Access-Control-Allow-Origin': origin };
+  }
+  return base;
 }
 
 function validateEvent(raw: unknown): IngestEvent | null {
