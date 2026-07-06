@@ -9,6 +9,16 @@
   if (window.__solarOptlyThankYouScriptLoaded) return;
 
   (function injectEarlyHideMainPageRows() {
+    // Only hide TYP marketing rows on thank-you / appointment pages — not on
+    // content pages where the Chameleon modal lives inside a vc_row.
+    var href = String(
+      window.location && window.location.href ? window.location.href : ''
+    );
+    var isTypLike =
+      href.indexOf('/typ/project-solar/appointment/sp-uk/') !== -1 ||
+      href.indexOf('/appointment-booking-form/sp-uk') !== -1;
+    if (!isTypLike) return;
+
     if (document.getElementById('solar-optly-early-hide')) return;
     var s = document.createElement('style');
     s.id = 'solar-optly-early-hide';
@@ -487,6 +497,46 @@
       'iframe[id^="' + CONFIG.iframeIdPrefix + '"]'
     );
     return prefixed || null;
+  }
+
+  // Chameleon mounts the iframe as:
+  // .chameleon-widget-wrapper > div (card, inline height ~450px) > iframe
+  // Overlays and height sync must target the card, not wrapper.parentElement.
+  function getChameleonWidgetParts(targetIframe) {
+    if (!targetIframe) {
+      return { wrapper: null, card: null, mount: null };
+    }
+
+    var wrapper = targetIframe.closest('.chameleon-widget-wrapper');
+    if (!wrapper) {
+      return {
+        wrapper: null,
+        card: null,
+        mount: targetIframe.parentElement || null,
+      };
+    }
+
+    var card = targetIframe.parentElement;
+    if (!card || card.parentElement !== wrapper) {
+      card = wrapper.firstElementChild;
+    }
+    if (!card || card.nodeType !== 1) {
+      card = null;
+    }
+
+    return {
+      wrapper: wrapper,
+      card: card,
+      mount: card || wrapper,
+    };
+  }
+
+  function ensureRelativeMount(mount) {
+    if (!mount) return;
+    var position = mount.style.position;
+    if (!position || position === 'static') {
+      mount.style.position = 'relative';
+    }
   }
 
   function extractTextFromAnswers(answers, keys) {
@@ -968,16 +1018,14 @@
     var targetIframe = getTargetIframe(preferredIFrameId);
     if (!targetIframe) return null;
 
-    var wrapper = targetIframe.closest('.chameleon-widget-wrapper');
-    var parent = wrapper ? (wrapper.parentElement || wrapper) : targetIframe.parentElement;
-    if (!parent) return null;
+    var parts = getChameleonWidgetParts(targetIframe);
+    var mount = parts.mount;
+    if (!mount) return null;
 
-    var overlay = parent.querySelector('[data-solar-optly-submit-overlay="1"]');
+    var overlay = mount.querySelector('[data-solar-optly-submit-overlay="1"]');
     if (overlay) return overlay;
 
-    if (!parent.style.position || parent.style.position === 'static') {
-      parent.style.position = 'relative';
-    }
+    ensureRelativeMount(mount);
 
     overlay = document.createElement('div');
     overlay.setAttribute('data-solar-optly-submit-overlay', '1');
@@ -999,7 +1047,7 @@
       document.head.appendChild(style);
     }
 
-    parent.appendChild(overlay);
+    mount.appendChild(overlay);
     return overlay;
   }
 
@@ -1017,11 +1065,12 @@
           parseInt(targetIframe.style.height, 10) || window.__solarOptlyChameleonHeight || 0;
       }
       targetIframe.style.height = '378px';
-      var wrapper = targetIframe.closest('.chameleon-widget-wrapper');
-      if (wrapper) {
-        wrapper.style.height = '378px';
-        var card = wrapper.firstElementChild;
-        if (card && card.nodeType === 1) card.style.height = '378px';
+      var parts = getChameleonWidgetParts(targetIframe);
+      if (parts.wrapper) {
+        parts.wrapper.style.height = '378px';
+      }
+      if (parts.card) {
+        parts.card.style.height = '378px';
       }
     }
   }
@@ -1046,26 +1095,26 @@
 
     var iframes = document.querySelectorAll('iframe[id^="' + CONFIG.iframeIdPrefix + '"]');
     for (var i = 0; i < iframes.length; i++) {
+      var parts = getChameleonWidgetParts(iframes[i]);
       if (restoreHeight > 0) {
         iframes[i].style.height = restoreHeight + 'px';
-      } else {
+        if (parts.wrapper) {
+          parts.wrapper.style.height = restoreHeight + 'px';
+        }
+        if (parts.card) {
+          parts.card.style.height = restoreHeight + 'px';
+        }
+      } else if (window.__solarOptlyIframeInjected) {
         iframes[i].style.removeProperty('height');
-      }
-      var wrapper = iframes[i].closest('.chameleon-widget-wrapper');
-      if (wrapper) {
-        if (restoreHeight > 0) {
-          wrapper.style.height = restoreHeight + 'px';
-        } else {
-          wrapper.style.removeProperty('height');
+        if (parts.wrapper) {
+          parts.wrapper.style.removeProperty('height');
         }
-        var card = wrapper.firstElementChild;
-        if (card && card.nodeType === 1) {
-          if (restoreHeight > 0) {
-            card.style.height = restoreHeight + 'px';
-          } else {
-            card.style.removeProperty('height');
-          }
+        if (parts.card) {
+          parts.card.style.removeProperty('height');
         }
+      } else {
+        // Keep Chameleon's card height (e.g. 450px) — stripping it collapses the modal form.
+        iframes[i].style.removeProperty('height');
       }
     }
     heightLog('hideFullPageSubmitOverlay', { restoreHeight: restoreHeight });
@@ -1075,15 +1124,13 @@
     var targetIframe = getTargetIframe(preferredIFrameId);
     if (!targetIframe) return null;
 
-    var wrapper = targetIframe.closest('.chameleon-widget-wrapper');
-    if (!wrapper) return null;
+    var parts = getChameleonWidgetParts(targetIframe);
+    var mount = parts.mount;
+    if (!mount) return null;
 
-    var parent = wrapper.parentElement || wrapper;
-    if (parent.style.position === '') {
-      parent.style.position = 'relative';
-    }
+    ensureRelativeMount(mount);
 
-    var overlay = parent.querySelector('[data-solar-optly-overlay="1"]');
+    var overlay = mount.querySelector('[data-solar-optly-overlay="1"]');
     if (overlay) return overlay;
 
     overlay = document.createElement('div');
@@ -1098,7 +1145,7 @@
     overlay.style.opacity = '0';
     overlay.style.pointerEvents = 'none';
     overlay.style.transition = 'opacity 400ms ease';
-    parent.appendChild(overlay);
+    mount.appendChild(overlay);
     return overlay;
   }
 
@@ -1114,10 +1161,9 @@
   function hideSwapOverlay(preferredIFrameId) {
     var targetIframe = getTargetIframe(preferredIFrameId);
     if (!targetIframe) return false;
-    var wrapper = targetIframe.closest('.chameleon-widget-wrapper');
-    if (!wrapper) return false;
-    var parent = wrapper.parentElement || wrapper;
-    var overlay = parent.querySelector('[data-solar-optly-overlay="1"]');
+    var parts = getChameleonWidgetParts(targetIframe);
+    if (!parts.mount) return false;
+    var overlay = parts.mount.querySelector('[data-solar-optly-overlay="1"]');
     if (!overlay) return false;
     overlay.style.transition = 'opacity 400ms ease';
     overlay.style.opacity = '0';
@@ -1130,20 +1176,20 @@
     if (!targetIframe) return false;
 
     var clearWrapperHeightConstraints = function () {
+      if (!window.__solarOptlyIframeInjected) return;
+
       var activeIframe = getTargetIframe(preferredIFrameId);
       if (!activeIframe) return;
       activeIframe.style.removeProperty('min-height');
 
-      var wrapper = activeIframe.closest('.chameleon-widget-wrapper');
-      if (!wrapper) return;
-      wrapper.style.removeProperty('height');
-      wrapper.style.removeProperty('min-height');
+      var parts = getChameleonWidgetParts(activeIframe);
+      if (!parts.wrapper) return;
+      parts.wrapper.style.removeProperty('height');
+      parts.wrapper.style.removeProperty('min-height');
 
-      var wrapperCard = wrapper.firstElementChild;
-      if (!wrapperCard || wrapperCard.nodeType !== 1) return;
-
-      wrapperCard.style.removeProperty('height');
-      wrapperCard.style.removeProperty('min-height');
+      if (!parts.card) return;
+      parts.card.style.removeProperty('height');
+      parts.card.style.removeProperty('min-height');
       heightLog('cleared wrapper height constraints', {
         iframeId: activeIframe.id,
       });
@@ -1161,6 +1207,14 @@
       activeIframe.style.removeProperty('min-height');
       activeIframe.style.height = normalizedHeight + 'px';
       clearWrapperHeightConstraints();
+
+      var parts = getChameleonWidgetParts(activeIframe);
+      if (parts.card) {
+        parts.card.style.height = normalizedHeight + 'px';
+      }
+      if (parts.wrapper) {
+        parts.wrapper.style.height = normalizedHeight + 'px';
+      }
 
       // Keep iframe visible/centered when height changes (e.g. step transitions)
       try {
@@ -1803,16 +1857,14 @@
     var targetIframe = getTargetIframe(preferredIFrameId);
     if (!targetIframe) return null;
 
-    var wrapper = targetIframe.closest('.chameleon-widget-wrapper');
-    var parent = wrapper ? (wrapper.parentElement || wrapper) : targetIframe.parentElement;
-    if (!parent) return null;
+    var parts = getChameleonWidgetParts(targetIframe);
+    var mount = parts.mount;
+    if (!mount) return null;
 
-    var existing = parent.querySelector('[data-solar-optly-postcode-tooltip="1"]');
+    var existing = mount.querySelector('[data-solar-optly-postcode-tooltip="1"]');
     if (existing) return existing;
 
-    if (!parent.style.position || parent.style.position === 'static') {
-      parent.style.position = 'relative';
-    }
+    ensureRelativeMount(mount);
 
     var cover = document.createElement('div');
     cover.setAttribute('data-solar-optly-postcode-tooltip', '1');
@@ -1829,7 +1881,7 @@
       'background-size:cover;background-position:center;background-repeat:no-repeat;' +
       "font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
       'color:#ffffff;opacity:0;transition:opacity .35s ease;pointer-events:auto;';
-    positionPostcodeOverlay(cover, targetIframe, parent);
+    positionPostcodeOverlay(cover, targetIframe, mount);
 
     var content = document.createElement('div');
     content.style.cssText = 'max-width:440px;width:100%;';
@@ -1877,12 +1929,12 @@
     content.appendChild(spinner);
 
     cover.appendChild(content);
-    parent.appendChild(cover);
+    mount.appendChild(cover);
 
     // Keep the cover aligned to the iframe if it resizes while visible.
     var reposition = function () {
-      var live = document.querySelector('[data-solar-optly-postcode-tooltip="1"]');
-      if (live) positionPostcodeOverlay(live, targetIframe, parent);
+      var live = mount.querySelector('[data-solar-optly-postcode-tooltip="1"]');
+      if (live) positionPostcodeOverlay(live, targetIframe, mount);
     };
     cover.__solarOptlyReposition = reposition;
     window.addEventListener('resize', reposition);
