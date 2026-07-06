@@ -106,7 +106,7 @@ export async function flushFunnelTelemetry() {
   }
   const batch = queue.splice(0, MAX_EVENTS_PER_FLUSH);
   try {
-    const res = await fetch(url.replace(/\/$/, ''), {
+    await fetch(url.replace(/\/$/, ''), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -114,10 +114,6 @@ export async function flushFunnelTelemetry() {
       },
       body: JSON.stringify({ events: batch }),
     });
-    if (!res.ok) {
-      console.warn('[funnelTelemetry] flush failed', res.status, await res.text().catch(() => ''));
-      queue.unshift(...batch);
-    }
   } catch (e) {
     console.warn('[funnelTelemetry] flush failed', e);
     queue.unshift(...batch);

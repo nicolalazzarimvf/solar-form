@@ -92,18 +92,13 @@ https://web.theecoexperts.com/5-reasons-to-install-solar-panels/?optly_qa=true&o
 - [ ] Form submit → TYP → iframe swaps to production `solar-form-eight.vercel.app/loader`
 - [ ] No postcode loader cover
 
-**Variation (console: `cro-693 | Variation 6`)**
+**Variation**
 
-- [ ] Postcode **Continue** click → branded loader cover (~5.5s min), not only address selection
-- [ ] Cover hides on form advance or 12s safety timeout; no double-click Continue needed
-- [ ] `#multistep-banner` hidden after **phone submit**, not only after typing phone
-- [ ] Phone submit → TYP redirect → **no flash** of Chameleon supplier/TYP copy before solar-form loader
-- [ ] Phone-submit overlay shows EE + PS collaboration strip (not spinner only)
-- [ ] Eligible + slots → experimental `/loader` → booking modal (no premature reveal at ~2.5s)
-- [ ] Duplicate phone (30d) / no slots / out-of-area → stays on Chameleon TYP, overlays removed
+- [ ] Postcode answered → branded loader cover (~5.5s min)
+- [ ] Cover hides on form advance or 12s timeout
+- [ ] TYP loads experimental Vercel preview hostname
 - [ ] Roof-change follow-up on imagery warning
 - [ ] Debug panel visible with `debug=true`
-- [ ] Safari + Chrome on advertorial → TYP redirect path
 
 ---
 
@@ -116,25 +111,7 @@ https://web.theecoexperts.com/5-reasons-to-install-solar-panels/?optly_qa=true&o
 
 ---
 
-## 7. Variation 6 handoff fixes (2026-07-06)
-
-**Script version:** `cro-693 | Variation 6` in [`optimizely-cro-693.js`](../optimizely-cro-693.js)
-
-| Fix | Summary |
-|-----|---------|
-| Postcode Continue | Loader also triggers on `pageChanged` when `lastAnsweredQuestion` is postcode |
-| Multistep banner | Hidden on phone submit via `hideMultistepBanner()` |
-| TYP flash | Full-page + iframe overlays held until `solar-optly-loader-complete`; 7s fallback (not 2.5s) |
-| Submit branding | EE + PS strip on phone-submit overlay |
-| Pipeline | Duplicate qualification guards; reveal blocked while checks in flight |
-
-Re-paste the full `optimizely-cro-693.js` into Optimizely Variation 1 after each deploy.
-
-**Telemetry CORS (confirmation page):** If you see `Access-Control-Allow-Origin` errors from `solar-form-52ub.vercel.app/api/telemetry`, redeploy the funnel-dashboard app so built-in preview origins apply, or set `ALLOWED_CORS_ORIGINS` on that Vercel project to include `https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app`.
-
----
-
-## 8. Pre-launch verification (2026-07-06)
+## 7. Pre-launch verification (2026-07-06)
 
 Automated checks completed before Optimizely UI setup:
 
@@ -152,7 +129,7 @@ Automated checks completed before Optimizely UI setup:
 
 ---
 
-## 9. Launch monitoring
+## 8. Launch monitoring
 
 After creating the experiment in Optimizely:
 
