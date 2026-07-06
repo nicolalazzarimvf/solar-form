@@ -130,6 +130,8 @@ https://web.theecoexperts.com/5-reasons-to-install-solar-panels/?optly_qa=true&o
 
 Re-paste the full `optimizely-cro-693.js` into Optimizely Variation 1 after each deploy.
 
+**Telemetry CORS (confirmation page):** If you see `Access-Control-Allow-Origin` errors from `solar-form-52ub.vercel.app/api/telemetry`, redeploy the funnel-dashboard app so built-in preview origins apply, or set `ALLOWED_CORS_ORIGINS` on that Vercel project to include `https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app`.
+
 ---
 
 ## 8. Pre-launch verification (2026-07-06)
