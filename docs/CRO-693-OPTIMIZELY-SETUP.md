@@ -108,3 +108,36 @@ https://web.theecoexperts.com/5-reasons-to-install-solar-panels/?optly_qa=true&o
 2. `git push mvf main` → production Vercel deploy.
 3. Port loader-cover `CONFIG` into [`optimizely.js`](../optimizely.js) with production URLs.
 4. Update Optimizely control / end experiment and ship to 100%.
+
+---
+
+## 7. Pre-launch verification (2026-07-06)
+
+Automated checks completed before Optimizely UI setup:
+
+| Check | Result |
+|-------|--------|
+| Target page loads | OK — `https://web.theecoexperts.com/5-reasons-to-install-solar-panels/` |
+| `.chameleon-widget-wrapper` present | OK — 1 wrapper, 1 iframe |
+| Chameleon form | OK — form `14378` at `chameleon-eu.web.theecoexperts.com` |
+| `window.optimizely` on page | OK — Optimizely snippet loaded |
+| Experimental Vercel `/loader` | OK — HTTP 200 |
+| Experimental assets (`tooltip-bkg.jpg`, `allowed-outward-codes.json`) | OK — HTTP 200 |
+| Solar Optly script active | Not yet — expected until experiment is created and scripts pasted |
+
+**Post-Optimizely QA required:** force each variation with `optly_qa` URLs (section 5) and complete the full form → TYP → booking path for control and CRO-693 variation.
+
+---
+
+## 8. Launch monitoring
+
+After creating the experiment in Optimizely:
+
+1. **Start at 10–20% traffic** on the target URL only.
+2. **Monitor Optimizely** for sample ratio mismatch and primary goal lift.
+3. **Monitor funnel dashboard** (`apps/funnel-dashboard` on Vercel) for:
+   - Drop-off between postcode → email → TYP → booking steps
+   - Compare control vs variation submission volumes once experiment is live
+4. **Watch for regressions:** slot-check failures, iframe height issues (Safari), loader cover blocking form advance
+5. **Ramp traffic** only after both variations pass manual QA and 24–48h of clean data at low traffic
+6. **Before full ramp:** confirm loader-cover copy with Luke Brown
