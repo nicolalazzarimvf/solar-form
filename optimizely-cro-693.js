@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 4');
+  console.log('cro-693 | Variation 5');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
@@ -10,6 +10,87 @@
     (window.__solarOptlyChangesAppliedCount || 0) + 1;
 
   if (window.__solarOptlyThankYouScriptLoaded) return;
+
+  (function escapeQuotesProjectSolarTyp() {
+    try {
+      var loc = window.location;
+      if (!loc) return;
+      var host = String(loc.hostname || '').toLowerCase();
+      var path = String(loc.pathname || '');
+      if (
+        host === 'quotes.theecoexperts.co.uk' &&
+        path.indexOf('/typ/project-solar/sp-uk') === 0
+      ) {
+        window.location.replace(
+          'https://web.theecoexperts.com/typ/project-solar/appointment/sp-uk/' +
+            (loc.search || '') +
+            (loc.hash || '')
+        );
+      }
+    } catch (e) { /* ignore */ }
+  })();
+
+  (function startAdvertorialRedirectNeutralizer() {
+    var path = '';
+    try {
+      path = String(
+        window.location && window.location.pathname ? window.location.pathname : ''
+      );
+    } catch (e) {
+      return;
+    }
+    if (path.indexOf('/5-reasons-to-install-solar-panels') === -1) return;
+    if (window.__solarOptlyRedirectNeutralizerActive) return;
+    window.__solarOptlyRedirectNeutralizerActive = true;
+
+    var nativeSetTimeout = window.setTimeout.bind(window);
+    var startedAt = Date.now();
+    var neutralizeForMs = 120000;
+
+    function isWrongTypRedirectUrl(url) {
+      var u = String(url || '').toLowerCase();
+      if (!u) return false;
+      return (
+        u.indexOf('quotes.theecoexperts.co.uk') !== -1 &&
+        u.indexOf('/typ/project-solar/sp-uk') !== -1
+      );
+    }
+
+    function clearWrongRedirectUrl() {
+      try {
+        if (isWrongTypRedirectUrl(window.redirectUrlAfterSubmission)) {
+          window.redirectUrlAfterSubmission = '';
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function shouldBlockHostRedirectCallback(callback) {
+      if (typeof callback !== 'function') return false;
+      try {
+        var src = String(callback);
+        return (
+          src.indexOf('redirectUrlAfterSubmission') !== -1 &&
+          src.indexOf('window.location.href') !== -1
+        );
+      } catch (e) {
+        return false;
+      }
+    }
+
+    window.setTimeout = function (callback, delay) {
+      if (shouldBlockHostRedirectCallback(callback)) {
+        clearWrongRedirectUrl();
+        return nativeSetTimeout(function () {}, delay);
+      }
+      return nativeSetTimeout(callback, delay);
+    };
+
+    (function tick() {
+      if (Date.now() - startedAt > neutralizeForMs) return;
+      clearWrongRedirectUrl();
+      nativeSetTimeout(tick, 100);
+    })();
+  })();
 
   (function injectEarlyHideMainPageRows() {
     // Only hide TYP marketing rows on thank-you / appointment pages — not on
@@ -54,6 +135,11 @@
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/loader',
     typPathContains: '/typ/project-solar/appointment/sp-uk/',
     typPathContainsAppointmentBooking: '/appointment-booking-form/sp-uk',
+    advertorialPathContains: '/5-reasons-to-install-solar-panels',
+    wrongTypHost: 'quotes.theecoexperts.co.uk',
+    wrongTypPathPrefix: '/typ/project-solar/sp-uk',
+    appointmentTypUrl:
+      'https://web.theecoexperts.com/typ/project-solar/appointment/sp-uk/',
     debug: false,
     maxWaitMs: 30000,
     pollMs: 250,
@@ -378,6 +464,25 @@
       href.indexOf(CONFIG.typPathContains) !== -1 ||
       href.indexOf(CONFIG.typPathContainsAppointmentBooking) !== -1
     );
+  }
+
+  function isWrongTypRedirectUrl(url) {
+    var u = String(url || '').toLowerCase();
+    if (!u) return false;
+    return (
+      u.indexOf(CONFIG.wrongTypHost) !== -1 &&
+      u.indexOf(CONFIG.wrongTypPathPrefix) !== -1
+    );
+  }
+
+  function clearWrongTypRedirectUrl(reason) {
+    try {
+      if (!isWrongTypRedirectUrl(window.redirectUrlAfterSubmission)) return;
+      window.redirectUrlAfterSubmission = '';
+      log('Cleared quotes TYP redirectUrlAfterSubmission', reason || '');
+    } catch (e) {
+      log('Failed to clear redirectUrlAfterSubmission', e);
+    }
   }
 
   function persistEligibilityMarker() {
@@ -2111,6 +2216,17 @@
     }
 
     log('dataLayer event seen', eventName, eventObj);
+
+    if (
+      eventObj.event === 'resultsPageURL' ||
+      eventObj.event === 'thankYouPageRequested' ||
+      eventObj.event === 'webform_submission_completed'
+    ) {
+      clearWrongTypRedirectUrl(eventObj.event);
+      if (isWrongTypRedirectUrl(eventObj.redirectUrl)) {
+        clearWrongTypRedirectUrl('redirectUrl:' + eventObj.event);
+      }
+    }
 
     if (eventObj.event === 'thankYouPageReached' || eventObj.event === 'webform_submission_completed') {
       syncMainPageRowVisibility();
