@@ -110,6 +110,20 @@ describe('resolveSubmissionListFilters', () => {
       event_type: 'user_action',
     });
   });
+
+  it('tag_adv preset filters submissions with ADV tag', () => {
+    const { activePreset, filters } = resolveSubmissionListFilters({ billy_preset: 'tag_adv' });
+    expect(activePreset).toBe('tag_adv');
+    expect(filters.tag).toBe('ADV');
+  });
+
+  it('roof_change_other preset matches any-event user_action', () => {
+    const { filters } = resolveSubmissionListFilters({ billy_preset: 'roof_change_other' });
+    expect(filters.any_event).toEqual({
+      step: 'Solar: Roof change — other (callback)',
+      event_type: 'user_action',
+    });
+  });
 });
 
 describe('submissionFiltersFromSearchParams', () => {

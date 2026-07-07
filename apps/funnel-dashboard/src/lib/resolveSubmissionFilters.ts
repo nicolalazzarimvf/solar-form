@@ -6,6 +6,8 @@ export type SubmissionListFilters = {
   event_type?: string;
   date_from?: string;
   date_to?: string;
+  /** Match submissions with at least one event carrying this tag. */
+  tag?: string;
   /** Match submissions that have at least one event matching (ILIKE), not only the latest row. */
   any_event?: { step?: string; event_type?: string };
   /** Exclude submissions that have at least one event matching (ILIKE) — compound "AND NOT". */
@@ -53,6 +55,7 @@ export function resolveSubmissionListFilters(sp: SubmissionSearchParams): {
         q: sp.q,
         step: useAny ? '' : slice.step !== undefined ? slice.step : '',
         event_type: useAny ? '' : slice.event_type !== undefined ? slice.event_type : '',
+        ...(slice.tag ? { tag: slice.tag } : {}),
         any_event: useAny
           ? { step: slice.step ?? '', event_type: slice.event_type ?? '' }
           : undefined,

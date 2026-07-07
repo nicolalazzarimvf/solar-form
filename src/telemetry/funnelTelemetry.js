@@ -27,6 +27,16 @@ function getTelemetryConfig() {
   return { url, key, enabled: Boolean(url && key) };
 }
 
+/** Comma-separated labels on every event (e.g. ADV on experimental Vercel). */
+function getDefaultTelemetryTags() {
+  const raw = (import.meta.env.VITE_FUNNEL_TELEMETRY_TAGS || '').trim();
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /**
  * @param {{ getSubmissionId: () => string, getSessionId: () => string }} getters
  */
@@ -77,6 +87,7 @@ export function queueFunnelEvent({
     step,
     response_summary,
     payload: stringifyPayload(payload),
+    tags: getDefaultTelemetryTags(),
   });
   if (queue.length >= MAX_EVENTS_PER_FLUSH) {
     void flushFunnelTelemetry();
@@ -106,7 +117,7 @@ export async function flushFunnelTelemetry() {
   }
   const batch = queue.splice(0, MAX_EVENTS_PER_FLUSH);
   try {
-    await fetch(url.replace(/\/$/, ''), {
+    const res = await fetch(url.replace(/\/$/, ''), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -114,6 +125,14 @@ export async function flushFunnelTelemetry() {
       },
       body: JSON.stringify({ events: batch }),
     });
+    if (!res.ok) {
+      console.warn(
+        '[funnelTelemetry] flush failed',
+        res.status,
+        await res.text().catch(() => '')
+      );
+      queue.unshift(...batch);
+    }
   } catch (e) {
     console.warn('[funnelTelemetry] flush failed', e);
     queue.unshift(...batch);

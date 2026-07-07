@@ -3,9 +3,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 80vh;
+  min-height: 100vh;
   font-family: 'Be Vietnam Pro', sans-serif;
-  background: linear-gradient(180deg, #DAE7E6 0%, #FFFFFF 100%);
+  background-color: #0d2838;
+  background-image:
+    linear-gradient(rgba(8, 28, 40, 0.55), rgba(8, 28, 40, 0.75)),
+    url('/loader-bkg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   padding: 2rem;
   opacity: 0;
   transition: opacity 500ms ease;
@@ -42,6 +48,7 @@
   max-width: 200px;
   object-fit: contain;
   transition: opacity 0.6s ease-in-out;
+  filter: brightness(0) invert(1);
 }
 
 .projectSolarLogo {
@@ -73,11 +80,12 @@
   height: 18px;
   max-width: 110px;
   object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 
 .partnershipText {
   font-size: 0.75rem;
-  color: #4F4F4F;
+  color: rgba(255, 255, 255, 0.9);
   margin: 0;
   white-space: nowrap;
 }
@@ -108,13 +116,13 @@
 
 .progressBackground {
   fill: none;
-  stroke: #DAE7E6;
+  stroke: rgba(255, 255, 255, 0.25);
   stroke-width: 8;
 }
 
 .progressBar {
   fill: none;
-  stroke: #03624C;
+  stroke: #ffffff;
   stroke-width: 8;
   stroke-linecap: round;
   transition: stroke-dasharray 0.1s ease-out;
@@ -127,24 +135,26 @@
   transform: translate(-50%, -50%);
   font-size: 1.25rem;
   font-weight: 600;
-  color: #03624C;
+  color: #ffffff;
 }
 
 .headline {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #000000;
+  color: #ffffff;
   margin: 0 0 0.5rem 0;
   min-height: 2.5rem;
   animation: crossfadeText 0.5s ease-in-out;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
 }
 
 .supportingText {
   font-size: 1rem;
-  color: #4F4F4F;
+  color: rgba(255, 255, 255, 0.92);
   margin: 0;
   min-height: 1.5rem;
   animation: crossfadeText 0.5s ease-in-out;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes crossfadeText {
@@ -158,10 +168,12 @@
   gap: 0.75rem;
   margin-top: 3rem;
   padding: 1.5rem;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   max-width: 400px;
   width: 100%;
+  backdrop-filter: blur(8px);
 }
 
 .trustItem {
@@ -169,7 +181,7 @@
   align-items: center;
   gap: 0.75rem;
   font-size: 0.875rem;
-  color: #4F4F4F;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .trustIcon {
@@ -178,7 +190,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  color: #03624C;
+  color: #ffffff;
   flex-shrink: 0;
 }
 

@@ -9,6 +9,7 @@ export type SubmissionListRow = {
   last_step: string;
   last_event_type: string;
   last_summary: string | null;
+  tags: string[] | null;
 };
 
 /** Same shape as the dashboard list query (GROUP BY + LATERAL latest event). */
@@ -45,6 +46,7 @@ export function buildSubmissionListWhereClause(filters: SubmissionListFilters): 
   const notStep = (notAnyEv?.step ?? '').trim();
   const notEt = (notAnyEv?.event_type ?? '').trim();
   const useNotAnyEvent = Boolean(notStep || notEt);
+  const tag = (filters.tag ?? '').trim();
   const dateFrom = parseDateParam(filters.date_from);
   const dateTo = parseDateParam(filters.date_to);
 
@@ -96,6 +98,13 @@ export function buildSubmissionListWhereClause(filters: SubmissionListFilters): 
     }
     conditions.push(`NOT EXISTS (SELECT 1 FROM journey_events j WHERE ${notParts.join(' AND ')})`);
   }
+  if (tag) {
+    conditions.push(
+      `EXISTS (SELECT 1 FROM journey_events jt WHERE jt.submission_id = s.submission_id AND $${i} = ANY(jt.tags))`
+    );
+    params.push(tag);
+    i += 1;
+  }
   if (dateFrom) {
     conditions.push(`s.last_at >= $${i}::date`);
     params.push(dateFrom);
@@ -136,7 +145,12 @@ export async function fetchSubmissionList(
            s.last_at,
            e.step AS last_step,
            e.event_type AS last_event_type,
-           e.response_summary AS last_summary
+           e.response_summary AS last_summary,
+           (
+             SELECT COALESCE(array_agg(DISTINCT t ORDER BY t), '{}'::text[])
+             FROM journey_events jt, unnest(jt.tags) AS t
+             WHERE jt.submission_id = s.submission_id
+           ) AS tags
     ${SUBMISSION_LIST_BASE}
     ${whereClause}
     ORDER BY s.last_at DESC

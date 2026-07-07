@@ -8,6 +8,7 @@ Next.js app (Vercel) with Google OAuth for `@mvfglobal.com` users, Heroku Postgr
 
    ```bash
    psql "$DATABASE_URL" -f ../../db/migrations/001_journey_events.sql
+   psql "$DATABASE_URL" -f ../../db/migrations/002_journey_event_tags.sql
    ```
 
 2. **Environment** — Copy `.env.example` to `.env.local` and fill values.
@@ -26,6 +27,7 @@ Next.js app (Vercel) with Google OAuth for `@mvfglobal.com` users, Heroku Postgr
 
    - `VITE_FUNNEL_TELEMETRY_URL=https://YOUR_DASHBOARD_DOMAIN/api/telemetry`
    - `VITE_FUNNEL_TELEMETRY_KEY` = same value as `TELEMETRY_INGEST_SECRET`
+   - **Experimental solar-form (CRO-693):** `VITE_FUNNEL_TELEMETRY_TAGS=ADV` on the experimental Vercel project (ingest also auto-tags ADV when `Origin` is the experimental deploy URL).
 
 ## Deploy on Vercel (second project — do not change solar-form’s root)
 

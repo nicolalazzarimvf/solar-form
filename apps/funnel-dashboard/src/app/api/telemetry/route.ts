@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { normalizeEventTags } from '@/lib/eventTags';
 
 const MAX_BODY_BYTES = 512 * 1024;
 const MAX_EVENTS = 100;
@@ -11,25 +12,43 @@ type IngestEvent = {
   step?: string;
   response_summary?: string | null;
   payload?: Record<string, unknown>;
+  tags?: string[];
 };
+
+/** Known solar-form deploy origins (merged with ALLOWED_CORS_ORIGINS). */
+const BUILTIN_SOLAR_FORM_ORIGINS = [
+  'http://localhost:5173',
+  'https://solar-form-eight.vercel.app',
+  'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app',
+];
 
 function corsHeaders(req: NextRequest): HeadersInit {
   const origin = req.headers.get('origin') ?? '';
-  const allowed = (process.env.ALLOWED_CORS_ORIGINS ?? '')
+  const fromEnv = (process.env.ALLOWED_CORS_ORIGINS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  const allowOrigin =
-    allowed.length === 0 ? '*' : allowed.includes(origin) ? origin : allowed[0];
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
+  const allowed = [...new Set([...BUILTIN_SOLAR_FORM_ORIGINS, ...fromEnv])];
+
+  const base: HeadersInit = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
   };
+
+  if (!origin) {
+    return base;
+  }
+  if (allowed.length === 0) {
+    return { ...base, 'Access-Control-Allow-Origin': '*' };
+  }
+  if (allowed.includes(origin)) {
+    return { ...base, 'Access-Control-Allow-Origin': origin };
+  }
+  return base;
 }
 
-function validateEvent(raw: unknown): IngestEvent | null {
+function validateEvent(raw: unknown, origin: string | null): IngestEvent | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
   const submission_id = typeof o.submission_id === 'string' ? o.submission_id.trim() : '';
@@ -52,6 +71,7 @@ function validateEvent(raw: unknown): IngestEvent | null {
     step,
     response_summary,
     payload,
+    tags: normalizeEventTags(o.tags, origin),
   };
 }
 
@@ -94,9 +114,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many events' }, { status: 400, headers });
   }
 
+  const origin = req.headers.get('origin');
+
   const events: IngestEvent[] = [];
   for (const item of eventsRaw) {
-    const v = validateEvent(item);
+    const v = validateEvent(item, origin);
     if (!v) {
       return NextResponse.json({ error: 'Invalid event' }, { status: 400, headers });
     }
@@ -109,8 +131,8 @@ export async function POST(req: NextRequest) {
     await client.query('BEGIN');
     for (const ev of events) {
       await client.query(
-        `INSERT INTO journey_events (submission_id, session_id, event_type, step, response_summary, payload)
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+        `INSERT INTO journey_events (submission_id, session_id, event_type, step, response_summary, payload, tags)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::text[])`,
         [
           ev.submission_id,
           ev.session_id ?? '',
@@ -118,6 +140,7 @@ export async function POST(req: NextRequest) {
           ev.step ?? '',
           ev.response_summary,
           JSON.stringify(ev.payload ?? {}),
+          ev.tags ?? [],
         ]
       );
     }

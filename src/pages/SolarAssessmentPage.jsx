@@ -6,6 +6,7 @@ import {
   RoofSegmentMap,
   PropertyMapSelector,
   ImageryAgeWarning,
+  RoofChangeFollowUp,
 } from '../components/forms';
 import {
   adjustSegmentPanelCounts,
@@ -23,6 +24,13 @@ import {
   getAnnualUsageByBedrooms,
 } from '../utils/savingsCalculations';
 import { queueFunnelEvent, slimSolarResponseForTelemetry, STEPS } from '../telemetry';
+import {
+  ROOF_CHANGE_TYPES,
+  canContinueSolarAssessment,
+  isDisqualifyingRoofChangeType,
+  isLoftConversion,
+  isQualifyingRoofChangeType,
+} from '../utils/roofChangeFlow';
 import styles from './SolarAssessmentPage.module.css';
 
 // Temporary flag to use mock data during UAT
@@ -106,7 +114,26 @@ export default function SolarAssessmentPage() {
   const [showPropertySelector, setShowPropertySelector] = useState(false);
   const [showImageryWarning, setShowImageryWarning] = useState(false);
   const [imageryWarningAnswered, setImageryWarningAnswered] = useState(false);
+  const [roofChangeFollowUpVisible, setRoofChangeFollowUpVisible] = useState(false);
   const [showSavingsTooltip, setShowSavingsTooltip] = useState(false);
+
+  // Restore imagery / roof-change UI if user navigates back from a later step.
+  useEffect(() => {
+    if (bookingData.roofChangedSinceImagery === false) {
+      setImageryWarningAnswered(true);
+      setRoofChangeFollowUpVisible(false);
+      return;
+    }
+    if (bookingData.roofChangeType && isQualifyingRoofChangeType(bookingData.roofChangeType)) {
+      setImageryWarningAnswered(true);
+      setRoofChangeFollowUpVisible(false);
+      return;
+    }
+    if (bookingData.roofChangedSinceImagery === true && !bookingData.roofChangeType) {
+      setRoofChangeFollowUpVisible(true);
+      setImageryWarningAnswered(false);
+    }
+  }, [bookingData.roofChangedSinceImagery, bookingData.roofChangeType]);
 
   // Calculate estimated annual savings based on selected segments
   const estimatedSavings = useMemo(() => {
@@ -630,27 +657,63 @@ export default function SolarAssessmentPage() {
   };
 
   const handleImageryWarningYes = () => {
-    // User says roof has changed - end journey
-    notifyParentSolarJourneyFailed('roof_changed_since_imagery');
-    setJourneyStatus('callback_required');
-    updateBookingData({
-      roofChangedSinceImagery: true,
-      currentPage: '/confirmation',
-      lastAction: 'roof_changed_since_imagery',
-      lastActionPage: '/solar-assessment',
-    });
+    setRoofChangeFollowUpVisible(true);
+    setImageryWarningAnswered(false);
+    updateBookingData({ roofChangedSinceImagery: true, roofChangeType: null });
     queueFunnelEvent({
       event_type: 'user_action',
-      step: STEPS.SOLAR_ROOF_CHANGED_YES,
-      response_summary: 'User said roof changed since satellite imagery — journey ended',
+      step: STEPS.SOLAR_ROOF_CHANGED_AWAITING_TYPE,
+      response_summary: 'User said roof changed since satellite imagery — awaiting change type',
       payload: { route: '/solar-assessment', imageryWarning: 'yes' },
     });
-    navigate('/confirmation', { replace: true });
+  };
+
+  const handleRoofChangeTypeSelect = (type) => {
+    if (isDisqualifyingRoofChangeType(type)) {
+      const failureReason = isLoftConversion(type) ? 'roof_loft_conversion' : 'roof_change_other';
+      const lastAction = isLoftConversion(type) ? 'roof_loft_conversion' : 'roof_change_other';
+      const step = isLoftConversion(type)
+        ? STEPS.SOLAR_ROOF_CHANGE_LOFT_CONVERSION
+        : STEPS.SOLAR_ROOF_CHANGE_OTHER;
+      notifyParentSolarJourneyFailed(failureReason);
+      setJourneyStatus('callback_required');
+      updateBookingData({
+        roofChangedSinceImagery: true,
+        roofChangeType: type,
+        currentPage: '/confirmation',
+        lastAction: lastAction,
+        lastActionPage: '/solar-assessment',
+      });
+      queueFunnelEvent({
+        event_type: 'user_action',
+        step: step,
+        response_summary: isLoftConversion(type)
+          ? 'User selected loft conversion — journey ended (callback)'
+          : 'User selected other roof change — journey ended (callback)',
+        payload: { route: '/solar-assessment', roofChangeType: type },
+      });
+      navigate('/confirmation', { replace: true });
+      return;
+    }
+
+    setImageryWarningAnswered(true);
+    setRoofChangeFollowUpVisible(false);
+    updateBookingData({ roofChangedSinceImagery: true, roofChangeType: type });
+    queueFunnelEvent({
+      event_type: 'user_action',
+      step:
+        type === ROOF_CHANGE_TYPES.HOUSE_EXTENSION
+          ? STEPS.SOLAR_ROOF_CHANGE_HOUSE_EXTENSION
+          : STEPS.SOLAR_ROOF_CHANGE_ROOF_REPAIRS,
+      response_summary: `User selected ${type} — continue online`,
+      payload: { route: '/solar-assessment', roofChangeType: type },
+    });
   };
 
   const handleImageryWarningNo = () => {
     setImageryWarningAnswered(true);
-    updateBookingData({ roofChangedSinceImagery: false });
+    setRoofChangeFollowUpVisible(false);
+    updateBookingData({ roofChangedSinceImagery: false, roofChangeType: null });
   };
 
   if (loading) {
@@ -811,7 +874,7 @@ export default function SolarAssessmentPage() {
           </button>
 
           {/* Imagery age warning - always shown until answered */}
-          {!imageryWarningAnswered && (
+          {!imageryWarningAnswered && !roofChangeFollowUpVisible && (
             <ImageryAgeWarning
               formattedDate={formatImageryDateForWarning(
                 solarData.imageryDate,
@@ -819,6 +882,12 @@ export default function SolarAssessmentPage() {
               )}
               onYes={handleImageryWarningYes}
               onNo={handleImageryWarningNo}
+            />
+          )}
+          {roofChangeFollowUpVisible && !imageryWarningAnswered && (
+            <RoofChangeFollowUp
+              selectedType={bookingData.roofChangeType}
+              onSelect={handleRoofChangeTypeSelect}
             />
           )}
 
@@ -901,7 +970,12 @@ export default function SolarAssessmentPage() {
             type="button"
             className={styles.continueButton}
             onClick={handleContinue}
-            disabled={selectedSegments.length === 0}
+            disabled={
+              !canContinueSolarAssessment({
+                imageryWarningAnswered,
+                selectedSegmentsCount: selectedSegments.length,
+              })
+            }
           >
             Continue
           </button>

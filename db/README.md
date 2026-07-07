@@ -17,6 +17,7 @@ Or with a raw connection string:
 
 ```bash
 psql "$DATABASE_URL" -f db/migrations/001_journey_events.sql
+psql "$DATABASE_URL" -f db/migrations/002_journey_event_tags.sql
 ```
 
 ## Vercel (funnel-dashboard)

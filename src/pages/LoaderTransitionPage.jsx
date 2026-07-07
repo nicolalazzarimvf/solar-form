@@ -6,17 +6,17 @@ const LOADER_STATES = [
   {
     headline: 'Checking your answers...',
     supportingText: "We're reviewing your property details.",
-    duration: 2000,
+    duration: 1200,
   },
   {
     headline: 'Matching you with a trusted solar installer',
     supportingText: 'We only work with vetted UK installers.',
-    duration: 2000,
+    duration: 1200,
   },
   {
     headline: "You're eligible for solar panels",
     supportingText: 'Connecting you with Project Solar UK...',
-    duration: 2000,
+    duration: 1200,
   },
 ];
 
@@ -75,7 +75,7 @@ export default function LoaderTransitionPage() {
       cumulativeTime += state.duration;
     });
 
-    const navigationTimeout = setTimeout(navigateAway, totalDuration + 500);
+    const navigationTimeout = setTimeout(navigateAway, totalDuration + 200);
     timeouts.push(navigationTimeout);
 
     return () => {

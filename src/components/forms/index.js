@@ -4,3 +4,4 @@ export { default as RoofSegmentSelection } from './RoofSegmentSelection';
 export { default as RoofFaceInfoOverlay } from './RoofFaceInfoOverlay';
 export { default as PropertyMapSelector } from './PropertyMapSelector';
 export { default as ImageryAgeWarning } from './ImageryAgeWarning';
+export { default as RoofChangeFollowUp } from './RoofChangeFollowUp';

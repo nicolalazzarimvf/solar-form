@@ -13,6 +13,7 @@ type EventRow = {
   step: string;
   response_summary: string | null;
   payload: unknown;
+  tags: string[] | null;
   created_at: Date;
 };
 
@@ -27,7 +28,7 @@ export default async function SubmissionDetailPage({
 
   const pool = getPool();
   const { rows } = await pool.query<EventRow>(
-    `SELECT id::text, submission_id, session_id, event_type, step, response_summary, payload, created_at
+    `SELECT id::text, submission_id, session_id, event_type, step, response_summary, payload, tags, created_at
      FROM journey_events
      WHERE submission_id = $1
      ORDER BY created_at ASC, id ASC`,
@@ -64,6 +65,16 @@ export default async function SubmissionDetailPage({
                 <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium dark:bg-zinc-800">
                   {ev.event_type}
                 </span>
+                {ev.tags && ev.tags.length > 0
+                  ? ev.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                      >
+                        {tag}
+                      </span>
+                    ))
+                  : null}
                 {ev.step ? (
                   <span className="font-mono text-sm text-zinc-700 dark:text-zinc-300">{ev.step}</span>
                 ) : null}

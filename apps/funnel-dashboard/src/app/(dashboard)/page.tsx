@@ -24,7 +24,8 @@ export default async function HomePage({
     activePreset !== '' ||
     Boolean((filters.q ?? '').trim()) ||
     Boolean((filters.date_from ?? '').trim()) ||
-    Boolean((filters.date_to ?? '').trim());
+    Boolean((filters.date_to ?? '').trim()) ||
+    Boolean((filters.tag ?? '').trim());
 
   const PAGE_SIZE = 50;
   const requestedPage = Math.max(1, Math.floor(Number(sp.page)) || 1);
@@ -81,8 +82,11 @@ export default async function HomePage({
     if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
     return `${s}s`;
   };
-
-  const SPECIAL_GROUP_TITLES = ['Booking page drop-off', 'By last event type'];
+  const SPECIAL_GROUP_TITLES = [
+    'Booking page drop-off',
+    'By last event type',
+    'Experiment (CRO-693)',
+  ];
   const renderGroupCard = (group: (typeof BILLY_QUICK_GROUPS)[number]) => (
     <div
       key={group.title}
@@ -391,7 +395,8 @@ export default async function HomePage({
       {dbError && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
           <strong>Database:</strong> {dbError}. Set <code className="rounded bg-red-100 px-1 dark:bg-red-900">DATABASE_URL</code> and run{' '}
-          <code className="rounded bg-red-100 px-1 dark:bg-red-900">db/migrations/001_journey_events.sql</code>.
+          <code className="rounded bg-red-100 px-1 dark:bg-red-900">db/migrations/001_journey_events.sql</code> and{' '}
+          <code className="rounded bg-red-100 px-1 dark:bg-red-900">db/migrations/002_journey_event_tags.sql</code>.
         </div>
       )}
 
@@ -400,6 +405,7 @@ export default async function HomePage({
           <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <tr>
               <th className="p-3 font-medium">Submission ID</th>
+              <th className="p-3 font-medium">Tags</th>
               <th className="p-3 font-medium">Events</th>
               <th className="p-3 font-medium">Last step</th>
               <th className="p-3 font-medium">Last type</th>
@@ -411,7 +417,7 @@ export default async function HomePage({
           <tbody>
             {rows.length === 0 && !dbError ? (
               <tr>
-                <td colSpan={7} className="p-6 text-center text-zinc-500">
+                <td colSpan={8} className="p-6 text-center text-zinc-500">
                   {hasActiveFilters ? (
                     <>
                       No submissions match these filters. Try{' '}
@@ -440,6 +446,22 @@ export default async function HomePage({
                     >
                       {r.submission_id}
                     </Link>
+                  </td>
+                  <td className="p-3">
+                    {r.tags && r.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {r.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-zinc-400">—</span>
+                    )}
                   </td>
                   <td className="p-3">{r.event_count}</td>
                   <td className="p-3 font-mono text-xs">{r.last_step || '—'}</td>
