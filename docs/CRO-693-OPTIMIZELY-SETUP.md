@@ -4,6 +4,8 @@
 **Repo branch:** `experimental` (Vercel preview)  
 **Ticket:** CRO-693 — loader cover + roof-change follow-up
 
+**Billy change log (logos, copy, roof options, dashboard filters):** [`CRO-693-BILLY-CHANGELOG.md`](CRO-693-BILLY-CHANGELOG.md)
+
 ---
 
 ## 1. Create experiment in Optimizely
@@ -33,7 +35,7 @@ Paste **one full script per variation** (entire file contents, no edits unless n
 ```javascript
 appUrl: 'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/loader',
 allowedOutwardCodesUrl: 'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/allowed-outward-codes.json',
-postcodeOverlayBgUrl: 'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/tooltip-bkg.jpg',
+postcodeOverlayBgUrl: 'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/loader-bkg.png',
 postcodeTooltipEnabled: true,
 debug: false,  // use ?debug=true on parent URL for QA
 ```
