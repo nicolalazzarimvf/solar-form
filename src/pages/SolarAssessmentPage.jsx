@@ -27,6 +27,7 @@ import { queueFunnelEvent, slimSolarResponseForTelemetry, STEPS } from '../telem
 import {
   ROOF_CHANGE_TYPES,
   canContinueSolarAssessment,
+  isDisqualifyingRoofChangeType,
   isLoftConversion,
   isQualifyingRoofChangeType,
 } from '../utils/roofChangeFlow';
@@ -668,20 +669,27 @@ export default function SolarAssessmentPage() {
   };
 
   const handleRoofChangeTypeSelect = (type) => {
-    if (isLoftConversion(type)) {
-      notifyParentSolarJourneyFailed('roof_loft_conversion');
+    if (isDisqualifyingRoofChangeType(type)) {
+      const failureReason = isLoftConversion(type) ? 'roof_loft_conversion' : 'roof_change_other';
+      const lastAction = isLoftConversion(type) ? 'roof_loft_conversion' : 'roof_change_other';
+      const step = isLoftConversion(type)
+        ? STEPS.SOLAR_ROOF_CHANGE_LOFT_CONVERSION
+        : STEPS.SOLAR_ROOF_CHANGE_OTHER;
+      notifyParentSolarJourneyFailed(failureReason);
       setJourneyStatus('callback_required');
       updateBookingData({
         roofChangedSinceImagery: true,
         roofChangeType: type,
         currentPage: '/confirmation',
-        lastAction: 'roof_loft_conversion',
+        lastAction: lastAction,
         lastActionPage: '/solar-assessment',
       });
       queueFunnelEvent({
         event_type: 'user_action',
-        step: STEPS.SOLAR_ROOF_CHANGE_LOFT_CONVERSION,
-        response_summary: 'User selected loft conversion — journey ended (callback)',
+        step: step,
+        response_summary: isLoftConversion(type)
+          ? 'User selected loft conversion — journey ended (callback)'
+          : 'User selected other roof change — journey ended (callback)',
         payload: { route: '/solar-assessment', roofChangeType: type },
       });
       navigate('/confirmation', { replace: true });

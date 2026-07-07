@@ -36,6 +36,7 @@ export const STEPS = {
   SOLAR_ROOF_CHANGE_HOUSE_EXTENSION: 'Solar: Roof change — house extension (continue)',
   SOLAR_ROOF_CHANGE_ROOF_REPAIRS: 'Solar: Roof change — roof repairs (continue)',
   SOLAR_ROOF_CHANGE_LOFT_CONVERSION: 'Solar: Roof change — loft conversion (callback)',
+  SOLAR_ROOF_CHANGE_OTHER: 'Solar: Roof change — other (callback)',
 
   ELIGIBILITY_RESULT: (eligible) =>
     eligible

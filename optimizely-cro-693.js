@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 12');
+  console.log('cro-693 | Variation 14');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
@@ -210,14 +210,14 @@
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/loader-bkg.png',
     postcodeOverlayMinMs: 5500, // keep the cover up at least this long (covers loader + ~4s engagement)
     postcodeOverlaySafetyMs: 12000, // hard auto-hide if no advance event arrives
-    postcodeTooltipCollabText: 'in collaboration with',
+    postcodeTooltipCollabText: '',
+    postcodeTooltipShowProjectSolar: false,
     postcodeTooltipTitle: 'Looking for appointments in your area',
     postcodeTooltipBody:
-      'Keep going with the form — The Eco Experts and Project Solar are checking whether you can book online in your area.',
-    // Branded cover after phone submit — hides Chameleon TYP until qualification resolves.
-    phoneSubmitLoaderTitle: 'Finalising your personalised quote',
-    phoneSubmitLoaderBody:
-      'Reviewing your details to see if you can book online with Project Solar.',
+      'Book an appointment via The Eco Experts in partnership with top rated solar providers.',
+    // Branded cover after phone submit — plain white + spinner (photo is on solar-form /loader only).
+    phoneSubmitLoaderTitle: '',
+    phoneSubmitLoaderBody: '',
   };
 
   // Override from window.__solarOptlyConfig (set before script loads)
@@ -1119,6 +1119,10 @@
     hidePhoneSubmitLoader(preferredIFrameId);
     hideFullPageOverlay();
     removeTypHandoffHideStyle();
+    if (window.__solarOptlyIframeInjected) {
+      applyBookingStageChrome();
+      watchBookingStageChrome();
+    }
     return true;
   }
 
@@ -1181,71 +1185,28 @@
     cover.setAttribute('data-solar-optly-phone-submit-loader', '1');
     cover.setAttribute('role', 'status');
     cover.setAttribute('aria-live', 'polite');
+    cover.setAttribute('aria-label', 'Loading');
     cover.style.cssText =
       'position:absolute;box-sizing:border-box;z-index:10002;overflow:hidden;' +
       'border-radius:8px;display:flex;align-items:center;justify-content:center;' +
-      'text-align:center;padding:28px 22px;' +
-      loaderBackgroundCss() +
-      "font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
-      'color:#ffffff;opacity:0;transition:opacity .25s ease;pointer-events:none;';
+      'background:#ffffff;opacity:0;transition:opacity .25s ease;pointer-events:none;';
     positionPostcodeOverlay(cover, targetIframe, mount);
 
-    var content = document.createElement('div');
-    content.style.cssText = 'max-width:440px;width:100%;';
-
-    if (CONFIG.ecoExpertsLogoUrl || CONFIG.projectSolarLogoUrl) {
-      var collabRow = document.createElement('div');
-      collabRow.style.cssText =
-        'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;' +
-        'margin:0 auto 20px auto;max-width:400px;';
-      if (CONFIG.ecoExpertsLogoUrl) {
-        collabRow.appendChild(
-          createLoaderLogoBadge(CONFIG.ecoExpertsLogoUrl, 'The Eco Experts', 22)
-        );
-      }
-      if (CONFIG.postcodeTooltipCollabText) {
-        var collabText = document.createElement('span');
-        collabText.style.cssText =
-          'font-size:13px;font-weight:500;line-height:1.35;opacity:0.95;' +
-          'text-shadow:0 1px 6px rgba(0,0,0,0.25);';
-        collabText.textContent = CONFIG.postcodeTooltipCollabText;
-        collabRow.appendChild(collabText);
-      }
-      if (CONFIG.projectSolarLogoUrl) {
-        collabRow.appendChild(
-          createLoaderLogoBadge(CONFIG.projectSolarLogoUrl, 'Project Solar', 22)
-        );
-      }
-      content.appendChild(collabRow);
+    var style = document.getElementById('solar-optly-spin-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'solar-optly-spin-style';
+      style.textContent = '@keyframes solar-optly-spin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(style);
     }
 
-    if (CONFIG.phoneSubmitLoaderTitle) {
-      var title = document.createElement('div');
-      title.style.cssText =
-        'font-weight:800;font-size:24px;line-height:1.2;letter-spacing:-0.01em;' +
-        'margin:0 0 12px 0;text-shadow:0 2px 12px rgba(0,0,0,0.35);';
-      title.textContent = CONFIG.phoneSubmitLoaderTitle;
-      content.appendChild(title);
-    }
-    if (CONFIG.phoneSubmitLoaderBody) {
-      var body = document.createElement('div');
-      body.style.cssText =
-        'font-weight:500;font-size:15px;line-height:1.55;opacity:.96;' +
-        'max-width:380px;margin:0 auto;text-shadow:0 1px 8px rgba(0,0,0,0.3);';
-      body.textContent = CONFIG.phoneSubmitLoaderBody;
-      content.appendChild(body);
-    }
-
-    ensurePostcodeSpinnerKeyframes();
     var spinner = document.createElement('div');
     spinner.setAttribute('aria-hidden', 'true');
     spinner.style.cssText =
-      'width:36px;height:36px;margin:26px auto 0;border-radius:50%;' +
-      'border:3px solid rgba(255,255,255,0.35);border-top-color:#ffffff;' +
-      'animation:solarOptlySpin .8s linear infinite;';
-    content.appendChild(spinner);
-
-    cover.appendChild(content);
+      'width:48px;height:48px;border:5px solid #DAE7E6;' +
+      'border-top-color:#03624C;border-radius:50%;' +
+      'animation:solar-optly-spin 0.8s linear infinite;';
+    cover.appendChild(spinner);
     mount.appendChild(cover);
 
     var reposition = function () {
@@ -1605,6 +1566,8 @@
           window.__solarOptlyIframeReadyForReveal = true;
           syncMainPageRowVisibility();
           hideFullPageSubmitOverlay();
+          applyBookingStageChrome();
+          watchBookingStageChrome();
           heightLog('received loader-complete; showing main page rows', {
             iframeId: activeIframe.id,
           });
@@ -1695,6 +1658,7 @@
               'disqualified': 'disqualified',
               'roof_changed_since_imagery': 'roof_changed_since_imagery',
               'roof_loft_conversion': 'roof_loft_conversion',
+              'roof_change_other': 'roof_change_other',
               'solar_no_segments': 'solar_no_segments',
               'solar_no_coverage': 'solar_no_coverage',
               'solar_api_error': 'solar_api_error',
@@ -1811,6 +1775,154 @@
       log('No Eco Experts header logo found to swap');
     }
     whitenProjectSolarHeaderLogos();
+  }
+
+  function ensureBookingStageChromeStyle() {
+    if (document.getElementById('solar-optly-booking-stage-style')) return;
+    var s = document.createElement('style');
+    s.id = 'solar-optly-booking-stage-style';
+    s.textContent =
+      '.solar-optly-booking-active .chameleon-overlay-awards,' +
+      '.solar-optly-booking-active .chameleon-overlay-logo,' +
+      '.solar-optly-booking-active .chameleon-overlay-header-logo,' +
+      '.solar-optly-booking-active #masthead .header-logo,' +
+      '.solar-optly-booking-active #masthead .brand-logo,' +
+      '.solar-optly-booking-active .site-header .header-logo,' +
+      '.solar-optly-booking-active .site-header .brand-logo,' +
+      '[data-solar-optly-booking-hidden="1"]{display:none!important}';
+    (document.head || document.documentElement).appendChild(s);
+  }
+
+  function hideBookingStageLegacyChrome() {
+    var awards = document.querySelectorAll('.chameleon-overlay-awards');
+    for (var i = 0; i < awards.length; i += 1) {
+      awards[i].setAttribute('data-solar-optly-booking-hidden', '1');
+    }
+
+    var logoSelectors = [
+      '.chameleon-overlay-logo',
+      '.chameleon-overlay-header-logo',
+      '#masthead .header-logo',
+      '#masthead .brand-logo',
+      '.site-header .header-logo',
+      '.site-header .brand-logo',
+    ];
+    for (var s = 0; s < logoSelectors.length; s += 1) {
+      var logos = document.querySelectorAll(logoSelectors[s]);
+      for (var j = 0; j < logos.length; j += 1) {
+        logos[j].setAttribute('data-solar-optly-booking-hidden', '1');
+      }
+    }
+
+    var headings = document.querySelectorAll('h1, h2, h3, .overlay-title, .vc_custom_heading');
+    for (var k = 0; k < headings.length; k += 1) {
+      var t = normalizeTypText(headings[k].textContent || '');
+      if (
+        t.indexOf('explore your solar options') !== -1 ||
+        t.indexOf('get free solar quotes') !== -1
+      ) {
+        headings[k].setAttribute('data-solar-optly-booking-hidden', '1');
+      }
+    }
+  }
+
+  function ensureBookingStageHeader() {
+    if (document.getElementById('solar-optly-booking-stage-header')) return;
+
+    var wrap = document.createElement('div');
+    wrap.id = 'solar-optly-booking-stage-header';
+    wrap.setAttribute('data-solar-optly-booking-header', '1');
+    wrap.style.cssText =
+      'text-align:center;color:#ffffff;padding:8px 16px 20px;max-width:720px;margin:0 auto;';
+
+    var partnership = document.createElement('div');
+    partnership.style.cssText =
+      'font-size:11px;font-weight:600;letter-spacing:0.1em;line-height:1.4;' +
+      'text-transform:uppercase;opacity:0.92;margin-bottom:14px;';
+    partnership.textContent = 'ECO EXPERTS IN PARTNERSHIP WITH';
+
+    var psLogo = document.createElement('img');
+    psLogo.src = CONFIG.projectSolarLogoUrl;
+    psLogo.alt = 'Project Solar';
+    psLogo.setAttribute('data-solar-optly-ps-header', '1');
+    psLogo.style.cssText =
+      'max-height:48px;width:auto;display:block;margin:0 auto 18px;' +
+      'filter:brightness(0) invert(1);';
+
+    var title = document.createElement('h1');
+    title.style.cssText =
+      'font-size:clamp(22px,4vw,32px);font-weight:700;line-height:1.25;margin:0;color:#ffffff;';
+    title.textContent = 'Book Your Free Home Assessment';
+
+    wrap.appendChild(partnership);
+    wrap.appendChild(psLogo);
+    wrap.appendChild(title);
+
+    var iframe = getTargetIframe(null);
+    var widget = iframe ? iframe.closest('.chameleon-widget-wrapper') : null;
+    var main = document.querySelector('.chameleon-overlay-main .chameleon-overlay-wrapper');
+    var mount =
+      (widget && widget.parentElement) ||
+      main ||
+      (iframe && iframe.parentElement) ||
+      document.querySelector('.chameleon-overlay-main');
+
+    if (mount) {
+      mount.insertBefore(wrap, mount.firstChild);
+      log('Inserted booking stage header');
+      return;
+    }
+
+    if (document.body) {
+      document.body.insertBefore(wrap, document.body.firstChild);
+      log('Inserted booking stage header on body (fallback)');
+    }
+  }
+
+  function applyBookingStageChrome() {
+    if (!window.__solarOptlyQualified && !window.__solarOptlyIframeInjected) return;
+    document.documentElement.classList.add('solar-optly-booking-active');
+    ensureBookingStageChromeStyle();
+    ensureProjectSolarHeaderWhiteStyle();
+    hideBookingStageLegacyChrome();
+    ensureBookingStageHeader();
+    log('Applied booking stage chrome');
+  }
+
+  function removeBookingStageChrome() {
+    document.documentElement.classList.remove('solar-optly-booking-active');
+    var header = document.getElementById('solar-optly-booking-stage-header');
+    if (header && header.parentElement) header.parentElement.removeChild(header);
+    var hidden = document.querySelectorAll('[data-solar-optly-booking-hidden="1"]');
+    for (var i = 0; i < hidden.length; i += 1) {
+      hidden[i].removeAttribute('data-solar-optly-booking-hidden');
+    }
+  }
+
+  function watchBookingStageChrome() {
+    if (window.__solarOptlyBookingChromeObserver) return;
+    if (!window.__solarOptlyQualified && !window.__solarOptlyIframeInjected) return;
+
+    try {
+      var debounceId = null;
+      var observer = new MutationObserver(function () {
+        if (!window.__solarOptlyQualified && !window.__solarOptlyIframeInjected) return;
+        if (debounceId) window.clearTimeout(debounceId);
+        debounceId = window.setTimeout(function () {
+          debounceId = null;
+          applyBookingStageChrome();
+        }, 100);
+      });
+      observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true,
+      });
+      window.__solarOptlyBookingChromeObserver = observer;
+      applyBookingStageChrome();
+      log('Booking stage chrome observer attached');
+    } catch (e) {
+      log('Failed to attach booking stage chrome observer', e);
+    }
   }
 
   function setMainPageRowVisibility(shouldShow) {
@@ -2009,6 +2121,7 @@
     window.__solarOptlySlotCheckInFlight = false;
     rollbackSolarFormInjection(preferredIFrameId);
     restoreHeaderLogo();
+    removeBookingStageChrome();
     markHandoffComplete();
     window.__solarOptlyIframeReadyForReveal = true;
     syncMainPageRowVisibility();
@@ -2244,7 +2357,8 @@
     window.__solarOptlyQualified = true;
     window.__solarOptlyIframeReadyForReveal = false;
     persistEligibilityMarker();
-    swapHeaderLogoToProjectSolar();
+    applyBookingStageChrome();
+    watchBookingStageChrome();
     log('Eligibility matched via', context);
     var preferredIFrameId = (eventObj && eventObj.iFrameId) || null;
     hideMultistepBanner();
@@ -2341,16 +2455,14 @@
     var content = document.createElement('div');
     content.style.cssText = 'max-width:440px;width:100%;';
 
-    if (CONFIG.ecoExpertsLogoUrl || CONFIG.projectSolarLogoUrl) {
+    if (CONFIG.ecoExpertsLogoUrl) {
       var collabRow = document.createElement('div');
       collabRow.style.cssText =
         'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;' +
         'margin:0 auto 20px auto;max-width:400px;';
-      if (CONFIG.ecoExpertsLogoUrl) {
-        collabRow.appendChild(
-          createLoaderLogoBadge(CONFIG.ecoExpertsLogoUrl, 'The Eco Experts', 22)
-        );
-      }
+      collabRow.appendChild(
+        createLoaderLogoBadge(CONFIG.ecoExpertsLogoUrl, 'The Eco Experts', 22)
+      );
       if (CONFIG.postcodeTooltipCollabText) {
         var collabText = document.createElement('span');
         collabText.style.cssText =
@@ -2359,12 +2471,20 @@
         collabText.textContent = CONFIG.postcodeTooltipCollabText;
         collabRow.appendChild(collabText);
       }
-      if (CONFIG.projectSolarLogoUrl) {
+      if (CONFIG.postcodeTooltipShowProjectSolar && CONFIG.projectSolarLogoUrl) {
         collabRow.appendChild(
           createLoaderLogoBadge(CONFIG.projectSolarLogoUrl, 'Project Solar', 22)
         );
       }
       content.appendChild(collabRow);
+    } else if (CONFIG.postcodeTooltipShowProjectSolar && CONFIG.projectSolarLogoUrl) {
+      var psOnlyRow = document.createElement('div');
+      psOnlyRow.style.cssText =
+        'display:flex;align-items:center;justify-content:center;margin:0 auto 20px auto;';
+      psOnlyRow.appendChild(
+        createLoaderLogoBadge(CONFIG.projectSolarLogoUrl, 'Project Solar', 22)
+      );
+      content.appendChild(psOnlyRow);
     }
 
     if (CONFIG.postcodeTooltipTitle) {
@@ -2823,7 +2943,8 @@
     }
     window.__solarOptlyQualified = true;
     window.__solarOptlyIframeReadyForReveal = false;
-    swapHeaderLogoToProjectSolar();
+    applyBookingStageChrome();
+    watchBookingStageChrome();
     hideIframeDuringSwap();
     showHandoffCover();
     syncMainPageRowVisibility();

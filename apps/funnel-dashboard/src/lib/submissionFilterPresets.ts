@@ -54,6 +54,11 @@ export const STEP_OPTION_GROUPS: { label: string; options: string[] }[] = [
       'Solar: Did not meet roof/panel rules — exit',
       'Solar: Qualified — continue to eligibility',
       'Solar: Roof changed since imagery — journey ended',
+      'Solar: Roof changed — awaiting change type',
+      'Solar: Roof change — house extension (continue)',
+      'Solar: Roof change — roof repairs (continue)',
+      'Solar: Roof change — loft conversion (callback)',
+      'Solar: Roof change — other (callback)',
     ],
   },
   {
@@ -97,6 +102,8 @@ export type BillyQuickSlice = Partial<{
   step: string;
   event_type: string;
   anyEventMatch: boolean;
+  /** Match submissions with at least one event carrying this tag (e.g. ADV). */
+  tag: string;
 }>;
 
 export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
@@ -148,6 +155,31 @@ export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
     event_type: 'user_action',
     anyEventMatch: true,
   },
+  roof_change_awaiting_type: {
+    step: 'Solar: Roof changed — awaiting change type',
+    event_type: 'user_action',
+    anyEventMatch: true,
+  },
+  roof_change_house_extension: {
+    step: 'Solar: Roof change — house extension (continue)',
+    event_type: 'user_action',
+    anyEventMatch: true,
+  },
+  roof_change_roof_repairs: {
+    step: 'Solar: Roof change — roof repairs (continue)',
+    event_type: 'user_action',
+    anyEventMatch: true,
+  },
+  roof_loft_conversion: {
+    step: 'Solar: Roof change — loft conversion (callback)',
+    event_type: 'user_action',
+    anyEventMatch: true,
+  },
+  roof_change_other: {
+    step: 'Solar: Roof change — other (callback)',
+    event_type: 'user_action',
+    anyEventMatch: true,
+  },
   eligibility_passed: {
     step: 'Eligibility: Passed — load appointment slots',
     event_type: 'eligibility',
@@ -169,6 +201,7 @@ export const BILLY_QUICK_MAP: Record<string, BillyQuickSlice> = {
   et_booking_result: { event_type: 'booking_result' },
   et_user_action: { event_type: 'user_action' },
   et_page_view: { event_type: 'page_view' },
+  tag_adv: { tag: 'ADV' },
 };
 
 export type BillyQuickGroup = {
@@ -212,7 +245,19 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
     options: [
       { value: 'solar_disqualified', label: 'Solar — roof/panel rules not met' },
       { value: 'eligibility_disqualified', label: 'Eligibility — disqualified' },
-      { value: 'roof_changed', label: 'Solar — roof changed since imagery' },
+      { value: 'roof_changed', label: 'Solar — roof changed (legacy exit)' },
+      { value: 'roof_loft_conversion', label: 'Solar — roof change: loft conversion (callback)' },
+      { value: 'roof_change_other', label: 'Solar — roof change: other (callback)' },
+    ],
+  },
+  {
+    title: 'Roof change (experimental flow)',
+    description:
+      'Matches if this roof-change step was recorded at any point during the journey.',
+    options: [
+      { value: 'roof_change_awaiting_type', label: 'Awaiting roof change type' },
+      { value: 'roof_change_house_extension', label: 'House extension — continue online' },
+      { value: 'roof_change_roof_repairs', label: 'Roof repairs — continue online' },
     ],
   },
   {
@@ -237,6 +282,11 @@ export const BILLY_QUICK_GROUPS: BillyQuickGroup[] = [
       { value: 'et_user_action', label: 'user_action' },
       { value: 'et_page_view', label: 'page_view' },
     ],
+  },
+  {
+    title: 'Experiment (CRO-693)',
+    description: 'Submissions with at least one event tagged ADV (experimental solar-form build).',
+    options: [{ value: 'tag_adv', label: 'ADV — experimental only' }],
   },
 ];
 

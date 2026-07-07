@@ -87,9 +87,9 @@
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/tooltip-bkg.jpg',
     postcodeOverlayMinMs: 5500, // keep the cover up at least this long (covers loader + ~4s engagement)
     postcodeOverlaySafetyMs: 12000, // hard auto-hide if no advance event arrives
-    postcodeTooltipTitle: 'Good news — you can book online!',
+    postcodeTooltipTitle: 'Looking for appointments in your area',
     postcodeTooltipBody:
-      "You're moments away. Answer a few quick questions and choose an appointment time that suits you — directly with Project Solar.",
+      'Keep going with the form — once you’ve finished, we’ll check whether you can book online with Project Solar.',
   };
 
   // Override from window.__solarOptlyConfig (set before script loads)

@@ -3,30 +3,37 @@ import {
   ROOF_CHANGE_TYPES,
   ROOF_CHANGE_OPTIONS,
   canContinueSolarAssessment,
+  isDisqualifyingRoofChangeType,
   isLoftConversion,
+  isOtherRoofChange,
   isQualifyingRoofChangeType,
 } from '../../utils/roofChangeFlow';
 
 describe('roofChangeFlow', () => {
-  it('exposes three options with two qualifying and one disqualifying', () => {
-    expect(ROOF_CHANGE_OPTIONS).toHaveLength(3);
+  it('exposes four options with two qualifying and two disqualifying', () => {
+    expect(ROOF_CHANGE_OPTIONS).toHaveLength(4);
     expect(ROOF_CHANGE_OPTIONS.filter((o) => o.qualifying)).toHaveLength(2);
-    expect(ROOF_CHANGE_OPTIONS.filter((o) => !o.qualifying)).toHaveLength(1);
-    expect(ROOF_CHANGE_OPTIONS.find((o) => !o.qualifying)?.id).toBe(
-      ROOF_CHANGE_TYPES.LOFT_CONVERSION
+    expect(ROOF_CHANGE_OPTIONS.filter((o) => !o.qualifying)).toHaveLength(2);
+    expect(ROOF_CHANGE_OPTIONS.find((o) => o.id === ROOF_CHANGE_TYPES.LOFT_CONVERSION)?.qualifying).toBe(
+      false
     );
+    expect(ROOF_CHANGE_OPTIONS.find((o) => o.id === ROOF_CHANGE_TYPES.OTHER)?.qualifying).toBe(false);
   });
 
   it('identifies qualifying types', () => {
     expect(isQualifyingRoofChangeType(ROOF_CHANGE_TYPES.HOUSE_EXTENSION)).toBe(true);
     expect(isQualifyingRoofChangeType(ROOF_CHANGE_TYPES.ROOF_REPAIRS)).toBe(true);
     expect(isQualifyingRoofChangeType(ROOF_CHANGE_TYPES.LOFT_CONVERSION)).toBe(false);
+    expect(isQualifyingRoofChangeType(ROOF_CHANGE_TYPES.OTHER)).toBe(false);
     expect(isQualifyingRoofChangeType(null)).toBe(false);
   });
 
-  it('identifies loft conversion', () => {
+  it('identifies disqualifying types', () => {
     expect(isLoftConversion(ROOF_CHANGE_TYPES.LOFT_CONVERSION)).toBe(true);
-    expect(isLoftConversion(ROOF_CHANGE_TYPES.HOUSE_EXTENSION)).toBe(false);
+    expect(isOtherRoofChange(ROOF_CHANGE_TYPES.OTHER)).toBe(true);
+    expect(isDisqualifyingRoofChangeType(ROOF_CHANGE_TYPES.LOFT_CONVERSION)).toBe(true);
+    expect(isDisqualifyingRoofChangeType(ROOF_CHANGE_TYPES.OTHER)).toBe(true);
+    expect(isDisqualifyingRoofChangeType(ROOF_CHANGE_TYPES.HOUSE_EXTENSION)).toBe(false);
   });
 
   it('blocks Continue until imagery is answered and segments are selected', () => {

@@ -27,6 +27,16 @@ function getTelemetryConfig() {
   return { url, key, enabled: Boolean(url && key) };
 }
 
+/** Comma-separated labels on every event (e.g. ADV on experimental Vercel). */
+function getDefaultTelemetryTags() {
+  const raw = (import.meta.env.VITE_FUNNEL_TELEMETRY_TAGS || '').trim();
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /**
  * @param {{ getSubmissionId: () => string, getSessionId: () => string }} getters
  */
@@ -77,6 +87,7 @@ export function queueFunnelEvent({
     step,
     response_summary,
     payload: stringifyPayload(payload),
+    tags: getDefaultTelemetryTags(),
   });
   if (queue.length >= MAX_EVENTS_PER_FLUSH) {
     void flushFunnelTelemetry();
