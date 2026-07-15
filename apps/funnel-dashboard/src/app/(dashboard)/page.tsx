@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPool } from '@/lib/db';
 import { DeleteSubmissionButton } from '@/components/DeleteSubmissionButton';
+import { DownloadRecapCsvLink } from '@/components/DownloadRecapCsvLink';
 import { FindSlotsCta } from '@/components/FindSlotsCta';
 import { fetchLast7DaysRecap, RECAP_CLICK_PRESETS } from '@/lib/last7DaysRecap';
 import { countMatchingSubmissions, fetchSubmissionList } from '@/lib/submissionListQuery';
@@ -163,9 +164,16 @@ export default async function HomePage({
             )}
           </div>
           <div className="mt-3 flex w-full flex-col rounded-lg border border-emerald-200/80 bg-emerald-50/60 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-300">
-                Last 7 days (recap)
-              </h3>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-300">
+                  Last 7 days (recap)
+                </h3>
+                <DownloadRecapCsvLink
+                  dateFrom={recapDateFrom}
+                  dateTo={recapDateTo}
+                  disabled={Boolean(dbError) || !recap}
+                />
+              </div>
               <p className="mt-1 text-xs text-emerald-800/90 dark:text-emerald-400/90">
                 Default is a rolling 7-day window from the database clock. You can optionally set a custom recap date
                 range below.

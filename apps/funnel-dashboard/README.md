@@ -163,3 +163,7 @@ Each `submissions[]` row:
 | `started_not_completed` | Started online journey, no terminal outcome |
 | `saw_form_not_started` | Saw thank-you only |
 | `in_progress` | Has events but none of the above |
+
+### Dashboard CSV download
+
+Logged-in `@mvfglobal.com` users can click **Download CSV** in the recap panel on the home page. It hits `GET /api/recap/csv?date_from=…&date_to=…` (session auth) and downloads the same per-submission rows as the JSON API (without daily summary).
