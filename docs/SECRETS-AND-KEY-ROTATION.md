@@ -43,6 +43,7 @@ Configured via [`apps/funnel-dashboard/.env.example`](/apps/funnel-dashboard/.en
 | `DATABASE_URL` | Heroku Postgres (pooler URL recommended on Vercel) | Heroku → Database → Credentials. Rotating DB password updates this string; **no app code change**. Redeploy / restart after change. |
 | `DATABASE_POOL_MAX` | Optional pool size | Not a secret. |
 | `TELEMETRY_INGEST_SECRET` | Validates `Authorization: Bearer …` on [`apps/funnel-dashboard/src/app/api/telemetry/route.ts`](/apps/funnel-dashboard/src/app/api/telemetry/route.ts) | Rotate with `openssl rand -base64 32` (or similar). Set on dashboard Vercel **and** `VITE_FUNNEL_TELEMETRY_KEY` on solar-form Vercel. |
+| `RECAP_API_TOKEN` | Validates `Authorization: Bearer …` or `x-api-key` on [`apps/funnel-dashboard/src/app/api/recap/route.ts`](/apps/funnel-dashboard/src/app/api/recap/route.ts) | Rotate with `openssl rand -base64 32`. Dashboard Vercel only. Share securely with Apps Script consumers (Script Properties). Independent from `TELEMETRY_INGEST_SECRET`. |
 | `ALLOWED_CORS_ORIGINS` | Comma-separated origins for telemetry `POST` CORS | Include production + experimental preview URLs (see `apps/funnel-dashboard/.env.example`). **Redeploy funnel-dashboard** after changes. |
 | `AUTH_SECRET` | Auth.js session encryption | `openssl rand -base64 32`. Rotating **invalidates existing sessions** (users sign in again). |
 | `AUTH_URL` | Canonical app URL for Auth.js | Set to production dashboard URL (see [README](/apps/funnel-dashboard/README.md)). |

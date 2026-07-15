@@ -4,6 +4,7 @@ export default auth((req) => {
   const path = req.nextUrl.pathname;
   if (path.startsWith('/api/auth')) return;
   if (path === '/api/telemetry') return;
+  if (path === '/api/recap') return;
   if (path.startsWith('/_next')) return;
   if (path === '/favicon.ico') return;
 
