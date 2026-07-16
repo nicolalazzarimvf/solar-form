@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useBooking } from '../contexts';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useBooking, isLockedStatus } from '../contexts';
 import { queueFunnelEvent, STEPS } from '../telemetry';
 
 /**
@@ -9,9 +9,13 @@ import { queueFunnelEvent, STEPS } from '../telemetry';
  * Sends solar-optly-prefill-request on mount; parent responds with solar-optly-prefill.
  */
 export function PrefillBridge() {
-  const { bookingData, setUserData, updateBookingData } = useBooking();
+  const { bookingData, resetForNewSubmission, setUserData, updateBookingData } = useBooking();
+  const bookingRef = useRef(bookingData);
+  bookingRef.current = bookingData;
+
   const [searchParams] = useSearchParams();
-  const appliedRef = useRef(false);
+  const navigate = useNavigate();
+  const appliedSubmissionRef = useRef('');
 
   const isOptlyIframe = searchParams.get('optly_iframe') === '1';
 
@@ -21,12 +25,9 @@ export function PrefillBridge() {
     const handleMessage = (event) => {
       const payload = event?.data;
       if (!payload || payload.type !== 'solar-optly-prefill') return;
-      if (appliedRef.current) return;
 
       const answers = payload.answers || {};
       if (Object.keys(answers).length === 0) return;
-
-      appliedRef.current = true;
 
       const titleCase = (s) => s ? s.replace(/\b\w/g, c => c.toUpperCase()) : '';
 
@@ -37,34 +38,56 @@ export function PrefillBridge() {
         phoneNumber: answers.phone_number || '',
         emailAddress: answers.email_address || '',
       };
-      setUserData(userData);
       const rawSid = answers.submissionId ?? answers.submission_id;
       const submissionId =
         rawSid != null && rawSid !== '' ? String(rawSid).trim() : '';
-      updateBookingData({
-        submissionId,
-      });
-      if (submissionId) {
-        queueFunnelEvent({
-          event_type: 'prefill_applied',
-          step: STEPS.PREFILL,
-          response_summary: 'Iframe received Chameleon answers; submissionId set',
-          submissionIdOverride: submissionId,
-          sessionIdOverride: bookingData.sessionId,
-          payload: {
-            has_first_name: Boolean(answers.first_name),
-            has_last_name: Boolean(answers.last_name),
-            has_postcode: Boolean(answers.primary_address_postalcode),
-            has_phone: Boolean(answers.phone_number),
-            has_email: Boolean(answers.email_address),
-          },
-        });
+
+      if (!submissionId) return;
+      if (appliedSubmissionRef.current === submissionId) return;
+
+      const current = bookingRef.current;
+      const currentSid = String(current.submissionId ?? '').trim();
+      const isNewSubmission = submissionId !== currentSid;
+      const wasTerminal =
+        isLockedStatus(current.journeyStatus) ||
+        current.journeyStatus === 'callback_required';
+
+      appliedSubmissionRef.current = submissionId;
+
+      let sessionIdForTelemetry = current.sessionId;
+
+      if (isNewSubmission) {
+        const next = resetForNewSubmission({ submissionId, userData });
+        sessionIdForTelemetry = next.sessionId;
+        if (wasTerminal && window.location.pathname === '/confirmation') {
+          navigate({ pathname: '/', search: window.location.search }, { replace: true });
+        }
+      } else {
+        setUserData(userData);
+        updateBookingData({ submissionId });
       }
+
+      queueFunnelEvent({
+        event_type: 'prefill_applied',
+        step: STEPS.PREFILL,
+        response_summary: isNewSubmission
+          ? 'New Chameleon submission — booking state reset'
+          : 'Iframe received Chameleon answers; submissionId set',
+        submissionIdOverride: submissionId,
+        sessionIdOverride: sessionIdForTelemetry,
+        payload: {
+          has_first_name: Boolean(answers.first_name),
+          has_last_name: Boolean(answers.last_name),
+          has_postcode: Boolean(answers.primary_address_postalcode),
+          has_phone: Boolean(answers.phone_number),
+          has_email: Boolean(answers.email_address),
+          is_new_submission: isNewSubmission,
+        },
+      });
     };
 
     window.addEventListener('message', handleMessage);
 
-    // Request prefill from parent (retry a few times in case parent script loads after us)
     const requestPrefill = () => {
       if (window.parent !== window) {
         window.parent.postMessage({ type: 'solar-optly-prefill-request' }, '*');
@@ -79,7 +102,7 @@ export function PrefillBridge() {
       clearTimeout(retry1);
       clearTimeout(retry2);
     };
-  }, [isOptlyIframe, setUserData, updateBookingData]);
+  }, [isOptlyIframe, navigate, resetForNewSubmission, setUserData, updateBookingData]);
 
   return null;
 }

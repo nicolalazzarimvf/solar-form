@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useBooking, isLockedStatus } from '../contexts';
+import { useBooking, shouldHardLock } from '../contexts';
 
 const CONFIRMATION_PATH = '/confirmation';
 const CALLBACK_STATUS = 'callback_required';
@@ -21,8 +21,12 @@ export function JourneyLockGuard() {
 
   const status = bookingData.journeyStatus;
 
-  // Hard lock: force the user onto /confirmation from anywhere in the funnel.
-  const hardLocked = isLockedStatus(status);
+  // Hard lock only when terminal status belongs to this submission (not a stale prior test).
+  const hardLocked = shouldHardLock(
+    status,
+    bookingData.submissionId,
+    bookingData.lockedSubmissionId
+  );
 
   // Pin the Back button on /confirmation for hard-locked states AND for
   // callback_required (e.g. "roof changed since imagery", "no solar data"

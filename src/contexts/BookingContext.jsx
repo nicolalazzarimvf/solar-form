@@ -18,6 +18,15 @@ export const LOCKED_JOURNEY_STATUSES = [
 
 export const isLockedStatus = (status) => LOCKED_JOURNEY_STATUSES.includes(status);
 
+/** Hard-lock only when terminal status belongs to the current submission. */
+export function shouldHardLock(status, submissionId, lockedSubmissionId) {
+  return (
+    isLockedStatus(status) &&
+    Boolean(submissionId) &&
+    lockedSubmissionId === submissionId
+  );
+}
+
 const DEFAULT_STATE = {
   // User data from Chameleon form
   firstName: '',
@@ -62,6 +71,8 @@ const DEFAULT_STATE = {
 
   // Chameleon form submission
   submissionId: '',
+  /** submissionId when a terminal status was set — scopes JourneyLockGuard */
+  lockedSubmissionId: '',
 
   // Session data
   sessionId: '',
@@ -173,7 +184,27 @@ export function BookingProvider({ children }) {
       sessionId: prev.sessionId || uuidv4(),
       journeyStartTime: prev.journeyStartTime || new Date().toISOString(),
       journeyStatus: 'started',
+      lockedSubmissionId: '',
     }));
+  }, []);
+
+  const resetForNewSubmission = useCallback(({ submissionId, userData = {} }) => {
+    const sessionId = uuidv4();
+    const journeyStartTime = new Date().toISOString();
+    const next = {
+      ...DEFAULT_STATE,
+      firstName: userData.firstName || '',
+      lastName: userData.lastName || '',
+      postcode: userData.postcode || '',
+      phoneNumber: userData.phoneNumber || '',
+      emailAddress: userData.emailAddress || '',
+      submissionId: submissionId || '',
+      sessionId,
+      journeyStartTime,
+    };
+    setBookingData(next);
+    persistState(next);
+    return next;
   }, []);
 
   const updateBookingData = useCallback((updates) => {
@@ -278,21 +309,32 @@ export function BookingProvider({ children }) {
   }, [updateBookingData]);
 
   const confirmBooking = useCallback((bookingReference) => {
-    updateBookingData({
+    setBookingData(prev => ({
+      ...prev,
       bookingReference,
       journeyStatus: 'booking_confirmed',
+      lockedSubmissionId: prev.submissionId || prev.lockedSubmissionId || '',
       lastAction: 'booking_confirmed',
       lastActionPage: '/confirmation',
-    });
-  }, [updateBookingData]);
+    }));
+  }, []);
 
   const setJourneyStatus = useCallback((status) => {
-    updateBookingData({ journeyStatus: status });
-  }, [updateBookingData]);
+    setBookingData(prev => {
+      const next = { ...prev, journeyStatus: status };
+      const pinsToSubmission =
+        isLockedStatus(status) || status === 'callback_required';
+      if (pinsToSubmission && prev.submissionId) {
+        next.lockedSubmissionId = prev.submissionId;
+      }
+      return next;
+    });
+  }, []);
 
   const value = {
     bookingData,
     initializeSession,
+    resetForNewSubmission,
     updateBookingData,
     setUserData,
     setAddressData,

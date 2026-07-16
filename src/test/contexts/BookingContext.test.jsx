@@ -1,8 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { BookingProvider, useBooking } from '../../contexts/BookingContext';
+import {
+  BookingProvider,
+  useBooking,
+  shouldHardLock,
+} from '../../contexts/BookingContext';
 
 describe('BookingContext', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    window.name = '';
+  });
+
   const wrapper = ({ children }) => (
     <BookingProvider>{children}</BookingProvider>
   );
@@ -92,11 +101,76 @@ describe('BookingContext', () => {
     const { result } = renderHook(() => useBooking(), { wrapper });
 
     act(() => {
+      result.current.updateBookingData({ submissionId: 'sub-1' });
+    });
+
+    act(() => {
       result.current.confirmBooking('PS-2024-001234');
     });
 
     expect(result.current.bookingData.bookingReference).toBe('PS-2024-001234');
     expect(result.current.bookingData.journeyStatus).toBe('booking_confirmed');
+    expect(result.current.bookingData.lockedSubmissionId).toBe('sub-1');
+  });
+
+  it('resetForNewSubmission clears stale terminal state', () => {
+    const { result } = renderHook(() => useBooking(), { wrapper });
+
+    act(() => {
+      result.current.updateBookingData({
+        submissionId: 'old-sub',
+        journeyStatus: 'session_expired',
+        lockedSubmissionId: 'old-sub',
+        firstName: 'Stale',
+      });
+    });
+
+    act(() => {
+      result.current.resetForNewSubmission({
+        submissionId: 'new-sub',
+        userData: {
+          firstName: 'Fresh',
+          lastName: 'User',
+          postcode: 'SW1A 1AA',
+          phoneNumber: '07700900000',
+          emailAddress: 'fresh@example.com',
+        },
+      });
+    });
+
+    expect(result.current.bookingData.submissionId).toBe('new-sub');
+    expect(result.current.bookingData.journeyStatus).toBe('started');
+    expect(result.current.bookingData.lockedSubmissionId).toBe('');
+    expect(result.current.bookingData.firstName).toBe('Fresh');
+    expect(
+      shouldHardLock(
+        result.current.bookingData.journeyStatus,
+        result.current.bookingData.submissionId,
+        result.current.bookingData.lockedSubmissionId
+      )
+    ).toBe(false);
+  });
+
+  it('setJourneyStatus records lockedSubmissionId for session_expired', () => {
+    const { result } = renderHook(() => useBooking(), { wrapper });
+
+    act(() => {
+      result.current.updateBookingData({ submissionId: 'sub-99' });
+    });
+
+    act(() => {
+      result.current.setJourneyStatus('session_expired');
+    });
+
+    expect(result.current.bookingData.journeyStatus).toBe('session_expired');
+    expect(result.current.bookingData.lockedSubmissionId).toBe('sub-99');
+    expect(
+      shouldHardLock(
+        result.current.bookingData.journeyStatus,
+        result.current.bookingData.submissionId,
+        result.current.bookingData.lockedSubmissionId
+      )
+    ).toBe(true);
   });
 
   it('throws error when used outside provider', () => {
