@@ -205,7 +205,7 @@
     }
     var slotAvailUrl = '';
     if (slotPcForUi && CONFIG.getAvailabilityApiUrl) {
-      slotAvailUrl = CONFIG.getAvailabilityApiUrl + '/get-availability?postcode=' + encodeURIComponent(slotPcForUi);
+      slotAvailUrl = buildGetAvailabilityUrl(slotPcForUi);
     }
     var slotMetaHtml = '';
     if (slotPcForUi) {
@@ -586,13 +586,58 @@
     return window.__solarOptlyAllowedOutwardPromise;
   }
 
+  /** After 18:00 UK, skip tomorrow (matches solar-form availabilityWindow.js). */
+  function getAvailabilityWindowQuery() {
+    var now = new Date();
+    var fmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    });
+    var parts = {};
+    fmt.formatToParts(now).forEach(function (p) {
+      if (p.type !== 'literal') parts[p.type] = p.value;
+    });
+    var year = Number(parts.year);
+    var month = Number(parts.month);
+    var day = Number(parts.day);
+    var hour = Number(parts.hour);
+    var offsetDays = hour >= 18 ? 2 : 1;
+    var utc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    utc.setUTCDate(utc.getUTCDate() + offsetDays);
+    var dd = utc.getUTCDate();
+    var mm = utc.getUTCMonth() + 1;
+    var yyyy = utc.getUTCFullYear();
+    return {
+      start_date:
+        (dd < 10 ? '0' : '') + dd + '-' + (mm < 10 ? '0' : '') + mm + '-' + yyyy,
+      number_of_days: 5,
+    };
+  }
+
+  function buildGetAvailabilityUrl(postcode) {
+    var windowParams = getAvailabilityWindowQuery();
+    return (
+      CONFIG.getAvailabilityApiUrl +
+      '/get-availability?postcode=' +
+      encodeURIComponent(postcode) +
+      '&start_date=' +
+      encodeURIComponent(windowParams.start_date) +
+      '&number_of_days=' +
+      windowParams.number_of_days
+    );
+  }
+
   function checkSlotsAvailable(postcode) {
     if (!postcode || typeof postcode !== 'string' || !postcode.trim()) {
       return Promise.resolve(false);
     }
     var pc = postcode.trim().replace(/\s/g, '');
     window.__solarOptlySlotCheckPostcode = pc;
-    var url = CONFIG.getAvailabilityApiUrl + '/get-availability?postcode=' + encodeURIComponent(pc);
+    var url = buildGetAvailabilityUrl(pc);
     var timeoutMs = CONFIG.slotCheckTimeoutMs || 5000;
     var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     var timeoutId = null;

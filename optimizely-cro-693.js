@@ -1,10 +1,47 @@
 (function () {
   'use strict';
-  console.log('cro-693 | Variation 14');
+  console.log('cro-693 | Variation 16');
 
   /* optimizely-cro-693.js — CRO-693 variation script (loader cover + experimental Vercel iframe).
      Paste into Optimizely Variation 1 only. Control uses optimizely.js — never both on the same page.
      Bump console.log Variation N on every script change. */
+
+  // Chameleon formLoader reads window.chameleonTestSettings.formId (NOT chameleonConfig).
+  // Must be set before runFormWidgetLoader() builds the iframe URL (page default is 14378).
+  (function applyChameleonFormIdOverride() {
+    var overrideFormId = 16026;
+
+    function patchTestSettings() {
+      window.chameleonTestSettings = window.chameleonTestSettings || {};
+      window.chameleonTestSettings.formId = overrideFormId;
+    }
+
+    patchTestSettings();
+
+    function wrapRunFormWidgetLoader() {
+      if (!window.chameleon || typeof window.chameleon.runFormWidgetLoader !== 'function') {
+        return false;
+      }
+      if (window.chameleon.runFormWidgetLoader.__solarOptlyFormIdPatched) return true;
+      var original = window.chameleon.runFormWidgetLoader;
+      window.chameleon.runFormWidgetLoader = function (partnerSiteConfig) {
+        patchTestSettings();
+        return original.call(this, partnerSiteConfig);
+      };
+      window.chameleon.runFormWidgetLoader.__solarOptlyFormIdPatched = true;
+      return true;
+    }
+
+    if (!wrapRunFormWidgetLoader()) {
+      var attempts = 0;
+      var timer = window.setInterval(function () {
+        attempts += 1;
+        if (wrapRunFormWidgetLoader() || attempts > 100) {
+          window.clearInterval(timer);
+        }
+      }, 50);
+    }
+  })();
 
   window.__solarOptlyChangesAppliedCount =
     (window.__solarOptlyChangesAppliedCount || 0) + 1;
@@ -155,6 +192,7 @@
     typPathContains: '/typ/project-solar/appointment/sp-uk/',
     typPathContainsAppointmentBooking: '/appointment-booking-form/sp-uk',
     advertorialPathContains: '/5-reasons-to-install-solar-panels',
+    chameleonFormId: 16026,
     wrongTypHost: 'quotes.theecoexperts.co.uk',
     wrongTypPathPrefix: '/typ/project-solar/sp-uk',
     appointmentTypUrl:
@@ -195,15 +233,8 @@
       'https://images-ulpn.ecs.prd9.eu-west-1.mvfglobal.net/wp-content/uploads/2025/10/Project-Solar-long-full-colour-without-tag.svg',
     ecoExpertsLogoUrl:
       'https://images-ulpn.ecs.prd9.eu-west-1.mvfglobal.net/mp/wp-content/uploads/sites/3/2022/09/ee-logo.svg',
-    // --- Post-postcode loader cover (engagement experiment) ---
-    // A full-iframe branded cover shown over Chameleon's (event-less) loading
-    // screen, triggered the moment the postcode is answered. It auto-hides when
-    // the form advances to the next step (or after a safety timeout) so it never
-    // blocks the form. Goal: lift drop-off into the appointment-booking stage.
-    // NOTE: not gated on live slot availability — Chameleon masks the postcode
-    // mid-form and only exposes answers at submission.
-    // TODO(copy): confirm final wording with Luke Brown.
-    postcodeTooltipEnabled: true,
+    // --- Post-postcode loader cover (disabled — keep native Chameleon postcode → next step) ---
+    postcodeTooltipEnabled: false,
     loaderBgUrl:
       'https://solar-form-git-experimental-mvfs-projects-bffd3209.vercel.app/loader-bkg.png',
     postcodeOverlayBgUrl:
@@ -333,7 +364,7 @@
     }
     var slotAvailUrl = '';
     if (slotPcForUi && CONFIG.getAvailabilityApiUrl) {
-      slotAvailUrl = CONFIG.getAvailabilityApiUrl + '/get-availability?postcode=' + encodeURIComponent(slotPcForUi);
+      slotAvailUrl = buildGetAvailabilityUrl(slotPcForUi);
     }
     var slotMetaHtml = '';
     if (slotPcForUi) {
@@ -773,13 +804,58 @@
     return window.__solarOptlyAllowedOutwardPromise;
   }
 
+  /** After 18:00 UK, skip tomorrow (matches solar-form availabilityWindow.js). */
+  function getAvailabilityWindowQuery() {
+    var now = new Date();
+    var fmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    });
+    var parts = {};
+    fmt.formatToParts(now).forEach(function (p) {
+      if (p.type !== 'literal') parts[p.type] = p.value;
+    });
+    var year = Number(parts.year);
+    var month = Number(parts.month);
+    var day = Number(parts.day);
+    var hour = Number(parts.hour);
+    var offsetDays = hour >= 18 ? 2 : 1;
+    var utc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    utc.setUTCDate(utc.getUTCDate() + offsetDays);
+    var dd = utc.getUTCDate();
+    var mm = utc.getUTCMonth() + 1;
+    var yyyy = utc.getUTCFullYear();
+    return {
+      start_date:
+        (dd < 10 ? '0' : '') + dd + '-' + (mm < 10 ? '0' : '') + mm + '-' + yyyy,
+      number_of_days: 5,
+    };
+  }
+
+  function buildGetAvailabilityUrl(postcode) {
+    var windowParams = getAvailabilityWindowQuery();
+    return (
+      CONFIG.getAvailabilityApiUrl +
+      '/get-availability?postcode=' +
+      encodeURIComponent(postcode) +
+      '&start_date=' +
+      encodeURIComponent(windowParams.start_date) +
+      '&number_of_days=' +
+      windowParams.number_of_days
+    );
+  }
+
   function checkSlotsAvailable(postcode) {
     if (!postcode || typeof postcode !== 'string' || !postcode.trim()) {
       return Promise.resolve(false);
     }
     var pc = postcode.trim().replace(/\s/g, '');
     window.__solarOptlySlotCheckPostcode = pc;
-    var url = CONFIG.getAvailabilityApiUrl + '/get-availability?postcode=' + encodeURIComponent(pc);
+    var url = buildGetAvailabilityUrl(pc);
     var timeoutMs = CONFIG.slotCheckTimeoutMs || 5000;
     var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     var timeoutId = null;

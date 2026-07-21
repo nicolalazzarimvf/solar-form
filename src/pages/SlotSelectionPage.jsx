@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBooking } from '../contexts';
 import { config } from '../config/env';
+import { getAvailabilityQueryParams } from '../utils/availabilityWindow';
 import { queueFunnelEvent, redactTelemetryObject, STEPS, supabaseEdgeMeta } from '../telemetry';
 import styles from './SlotSelectionPage.module.css';
 
@@ -83,7 +84,12 @@ export default function SlotSelectionPage() {
 
       const postcode = (bookingData.postcode || '').trim().replace(/\s/g, '');
       const edgeFn = 'get-availability';
-      const url = `${config.projectSolarMvfApiUrl}/${edgeFn}?postcode=${encodeURIComponent(postcode)}`;
+      const windowParams = getAvailabilityQueryParams();
+      const url =
+        `${config.projectSolarMvfApiUrl}/${edgeFn}` +
+        `?postcode=${encodeURIComponent(postcode)}` +
+        `&start_date=${encodeURIComponent(windowParams.start_date)}` +
+        `&number_of_days=${windowParams.number_of_days}`;
       const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       const response = await fetch(url, { method: 'GET' });
       const duration_ms = typeof performance !== 'undefined' ? Math.round(performance.now() - t0) : null;
@@ -97,7 +103,7 @@ export default function SlotSelectionPage() {
             ...supabaseEdgeMeta(edgeFn),
             api: 'get_availability',
             route: '/slot-selection',
-            request: { postcode },
+            request: { postcode, ...windowParams },
             duration_ms,
           }),
         });
@@ -143,7 +149,7 @@ export default function SlotSelectionPage() {
           ...supabaseEdgeMeta(edgeFn),
           api: 'get_availability',
           route: '/slot-selection',
-          request: { postcode },
+          request: { postcode, ...windowParams },
           response: { slotCount: normalizedSlots.length },
           duration_ms,
         }),
