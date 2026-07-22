@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking, useInactivity } from '../contexts';
 import { queueFunnelEvent, STEPS } from '../telemetry';
-import { isUkMobileE164, normalizeUkPhoneE164 } from '../utils/projectSolarBooking';
+import { normalizeUkPhoneE164 } from '../utils/projectSolarBooking';
 import styles from './ConfirmationPage.module.css';
 
 const USE_MOCK_DATA = false;
@@ -88,16 +88,11 @@ export default function ConfirmationPage() {
         throw new Error('No appointment slot selected');
       }
 
-      // Upstream validates customer.mobile as a UK mobile — landlines return 422 validation.phone.
-      const mobile = normalizeUkPhoneE164(bookingData.phoneNumber);
-      if (!mobile) {
+      // Normalise to E.164 UK (+44…) — mobiles and landlines both accepted.
+      const phone = normalizeUkPhoneE164(bookingData.phoneNumber);
+      if (!phone) {
         throw new Error(
-          'Please add a UK mobile number (07…) for online booking. If you only have a landline, call 0800 112 3110.'
-        );
-      }
-      if (!isUkMobileE164(mobile)) {
-        throw new Error(
-          'Online booking requires a UK mobile (07…). Landline numbers are rejected by the installer. Update your number on the slot step or call 0800 112 3110.'
+          'Please add a valid UK phone number for online booking, or call 0800 112 3110.'
         );
       }
 

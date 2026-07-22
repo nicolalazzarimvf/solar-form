@@ -407,16 +407,16 @@ export default function SlotSelectionPage() {
           )}
           {missingPhone && (
             <div className={styles.contactField}>
-              <label htmlFor="slot-phone">Mobile number *</label>
+              <label htmlFor="slot-phone">Phone number *</label>
               <input
                 id="slot-phone"
                 type="tel"
                 value={contactOverrides.phone}
                 onChange={(e) => setContactOverrides(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="07XXX XXXXXX"
+                placeholder="07XXX XXXXXX or 01XXX XXXXXX"
                 autoComplete="tel"
               />
-              <span className={styles.contactFieldHint}>Please enter a UK mobile number (07xxx)</span>
+              <span className={styles.contactFieldHint}>Please enter a UK phone number</span>
             </div>
           )}
         </div>

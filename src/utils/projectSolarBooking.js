@@ -19,15 +19,6 @@ export function normalizeUkPhoneE164(raw) {
 }
 
 /**
- * Project Solar expects a UK mobile (07…), not a geographic/landline number.
- * E.164 after normalisation should be +447 followed by 9 subscriber digits.
- */
-export function isUkMobileE164(mobile) {
-  if (!mobile || !mobile.startsWith('+44')) return false;
-  return /^\+447[1-9]\d{8}$/.test(mobile);
-}
-
-/**
  * Edge function returns { status, message, upstream_status, details } — not always { error }.
  */
 export function formatBookAppointmentApiError(errorData) {
